@@ -26,6 +26,7 @@ import {
   Star,
 } from "lucide-react"
 import AIChat from "./ai-chat"
+import WhatsAppConnection from "./whatsapp-connection"
 
 interface Conversation {
   id: string
@@ -191,6 +192,8 @@ export default function ThreeColumnWorkspace({ userRole, userProfile }: ThreeCol
       icon: TrendingUp,
     },
   ])
+
+  const [whatsappConnected, setWhatsappConnected] = useState(false)
 
   const handleTaskToggle = (taskId: string) => {
     setTasks(
@@ -522,6 +525,21 @@ export default function ThreeColumnWorkspace({ userRole, userProfile }: ThreeCol
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Conexão WhatsApp */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-medium text-sm">WhatsApp</h3>
+                <Badge className={whatsappConnected ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                  {whatsappConnected ? "Conectado" : "Desconectado"}
+                </Badge>
+              </div>
+              <div className="space-y-3">
+                <WhatsAppConnection userRole={userRole} clientId="1" onConnectionChange={setWhatsappConnected} />
               </div>
             </div>
 

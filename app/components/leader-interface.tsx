@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Users, Smile, Frown, Meh } from "lucide-react"
+import { Users, Smile, Frown, Meh, TrendingUp, CheckCircle2, AlertTriangle } from "lucide-react"
 import type { User } from "@/types/user"
 import ThreeColumnWorkspace from "./three-column-workspace"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface LeaderInterfaceProps {
   userProfile?: User
@@ -67,6 +68,59 @@ export default function LeaderInterface({ userProfile }: LeaderInterfaceProps) {
           </div>
         </div>
       </header>
+
+      {/* Stats Cards - Dashboard de Clima */}
+      <div className="max-w-full px-4 sm:px-6 lg:px-8 py-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <Users className="h-8 w-8 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold">{teamStats.totalMembers}</p>
+                  <p className="text-sm text-gray-600">Membros da Equipe</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <TrendingUp className="h-8 w-8 text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold">{Math.round(teamStats.avgSentiment * 100)}%</p>
+                  <p className="text-sm text-gray-600">Clima da Equipe</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <CheckCircle2 className="h-8 w-8 text-purple-600" />
+                <div>
+                  <p className="text-2xl font-bold">{teamStats.tasksCompleted}</p>
+                  <p className="text-sm text-gray-600">Tarefas Concluídas</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="h-8 w-8 text-orange-600" />
+                <div>
+                  <p className="text-2xl font-bold">{teamStats.pendingTasks}</p>
+                  <p className="text-sm text-gray-600">Tarefas Pendentes</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <ThreeColumnWorkspace userRole="leader" userProfile={userProfile} />
     </div>
