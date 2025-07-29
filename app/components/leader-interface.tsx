@@ -20,6 +20,7 @@ import {
   Meh,
   Plus,
 } from "lucide-react"
+import WhatsAppUniversal from "./whatsapp-universal"
 import type { User } from "@/types/user"
 
 interface LeaderInterfaceProps {
@@ -138,9 +139,10 @@ export default function LeaderInterface({ userProfile }: LeaderInterfaceProps) {
         </div>
 
         <Tabs defaultValue="team" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="team">Equipe</TabsTrigger>
             <TabsTrigger value="contacts">Contatos</TabsTrigger>
+            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
 
@@ -286,6 +288,10 @@ export default function LeaderInterface({ userProfile }: LeaderInterfaceProps) {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          <TabsContent value="whatsapp">
+            <WhatsAppUniversal userRole="leader" clientId="1" canConnect={true} />
           </TabsContent>
 
           <TabsContent value="analytics">

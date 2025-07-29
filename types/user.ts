@@ -3,6 +3,7 @@ export interface User {
   name: string
   email: string
   role: "simple" | "leader" | "master"
+  clientId: string // Empresa/Cliente
   position?: string
   department?: string
   discProfile?: "D" | "I" | "S" | "C"
@@ -27,22 +28,57 @@ export interface User {
   }
 }
 
-export interface Task {
+export interface Client {
   id: string
-  title: string
-  description: string
-  priority: "high" | "medium" | "low"
-  status: "pending" | "in-progress" | "completed"
-  dueDate: string
-  assignedBy?: string
-  category: string
+  name: string
+  plan: "basic" | "standard" | "premium"
+  status: "active" | "trial" | "suspended" | "expired"
+  users: number
+  maxUsers: number
+  whatsappConnections: number
+  maxWhatsappConnections: number
+  apiCalls: number
+  maxApiCalls: number
+  createdAt: string
+  expiresAt: string
+  features: {
+    whatsappIntegration: boolean
+    sentimentAnalysis: boolean
+    aiSuggestions: boolean
+    customReports: boolean
+    apiAccess: boolean
+  }
+  consumption: {
+    messages: number
+    aiAnalysis: number
+    reports: number
+    storage: number
+  }
+  limits: {
+    messagesPerMonth: number
+    aiAnalysisPerMonth: number
+    reportsPerMonth: number
+    storageGB: number
+  }
 }
 
-export interface AIConfig {
-  teacherMode: number
-  improvementSuggestions: number
-  profileQuestions: number
-  sentimentAnalysis: boolean
-  autoResponses: boolean
-  learningMode: boolean
+export interface WhatsAppSession {
+  id: string
+  clientId: string
+  name: string
+  status: "disconnected" | "connecting" | "scan_qr" | "connected"
+  qr?: string
+  phone?: string
+  lastActivity: string
+  messagesCount: number
+}
+
+export interface SystemHealth {
+  status: "healthy" | "warning" | "critical"
+  uptime: number
+  activeClients: number
+  totalMessages: number
+  aiAccuracy: number
+  responseTime: number
+  errors: number
 }
