@@ -3,7 +3,7 @@ export interface User {
   name: string
   email: string
   role: "simple" | "leader" | "master"
-  clientId: string // Empresa/Cliente
+  clientId: string
   position?: string
   department?: string
   discProfile?: "D" | "I" | "S" | "C"
@@ -28,6 +28,56 @@ export interface User {
   }
 }
 
+export interface APIConfig {
+  openai?: {
+    apiKey: string
+    model: string
+    maxTokens: number
+    temperature: number
+    enabled: boolean
+  }
+  gemini?: {
+    apiKey: string
+    model: string
+    maxTokens: number
+    temperature: number
+    enabled: boolean
+  }
+  internetAccess?: {
+    enabled: boolean
+    searchEngine: "google" | "bing"
+    apiKey: string
+    maxQueries: number
+  }
+  whatsapp?: {
+    enabled: boolean
+    maxConnections: number
+    webhookUrl: string
+  }
+}
+
+export interface TokenUsage {
+  openai: {
+    used: number
+    limit: number
+    cost: number
+  }
+  gemini: {
+    used: number
+    limit: number
+    cost: number
+  }
+  internetQueries: {
+    used: number
+    limit: number
+  }
+  whatsappMessages: {
+    sent: number
+    received: number
+    limit: number
+  }
+}
+
 export interface Client {
   id: string
   name: string
@@ -41,12 +91,16 @@ export interface Client {
   maxApiCalls: number
   createdAt: string
   expiresAt: string
+  apiConfig: APIConfig
+  tokenUsage: TokenUsage
   features: {
     whatsappIntegration: boolean
     sentimentAnalysis: boolean
     aiSuggestions: boolean
     customReports: boolean
     apiAccess: boolean
+    internetAccess: boolean
+    aiChat: boolean
   }
   consumption: {
     messages: number
@@ -59,7 +113,17 @@ export interface Client {
     aiAnalysisPerMonth: number
     reportsPerMonth: number
     storageGB: number
+    tokensPerMonth: number
   }
+}
+
+export interface ChatMessage {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  timestamp: string
+  tokens?: number
+  model?: string
 }
 
 export interface WhatsAppSession {

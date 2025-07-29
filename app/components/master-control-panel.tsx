@@ -26,9 +26,11 @@ import {
   Shield,
   BarChart3,
   RefreshCw,
+  Key,
 } from "lucide-react"
 import WhatsAppUniversal from "./whatsapp-universal"
 import type { Client, SystemHealth } from "@/types/user"
+import ClientAPIManager from "./client-api-manager"
 
 export default function MasterControlPanel() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null)
@@ -46,12 +48,47 @@ export default function MasterControlPanel() {
       maxApiCalls: 10000,
       createdAt: "2024-01-01",
       expiresAt: "2024-12-31",
+      apiConfig: {
+        openai: {
+          apiKey: "sk-1234567890abcdef",
+          model: "gpt-4",
+          maxTokens: 2000,
+          temperature: 0.7,
+          enabled: true,
+        },
+        gemini: {
+          apiKey: "AIza1234567890",
+          model: "gemini-pro",
+          maxTokens: 1500,
+          temperature: 0.8,
+          enabled: true,
+        },
+        internetAccess: {
+          enabled: true,
+          searchEngine: "google",
+          apiKey: "google_search_key",
+          maxQueries: 1000,
+        },
+        whatsapp: {
+          enabled: true,
+          maxConnections: 5,
+          webhookUrl: "https://techcorp.com/webhook",
+        },
+      },
+      tokenUsage: {
+        openai: { used: 45000, limit: 100000, cost: 67.5 },
+        gemini: { used: 23000, limit: 50000, cost: 23.45 },
+        internetQueries: { used: 234, limit: 1000 },
+        whatsappMessages: { sent: 1240, received: 2340, limit: 10000 },
+      },
       features: {
         whatsappIntegration: true,
         sentimentAnalysis: true,
         aiSuggestions: true,
         customReports: true,
         apiAccess: true,
+        internetAccess: true,
+        aiChat: true,
       },
       consumption: {
         messages: 15420,
@@ -64,6 +101,7 @@ export default function MasterControlPanel() {
         aiAnalysisPerMonth: 25000,
         reportsPerMonth: 500,
         storageGB: 10,
+        tokensPerMonth: 150000,
       },
     },
     {
@@ -79,12 +117,47 @@ export default function MasterControlPanel() {
       maxApiCalls: 5000,
       createdAt: "2024-01-15",
       expiresAt: "2024-02-15",
+      apiConfig: {
+        openai: {
+          apiKey: "",
+          model: "gpt-3.5-turbo",
+          maxTokens: 1000,
+          temperature: 0.7,
+          enabled: false,
+        },
+        gemini: {
+          apiKey: "",
+          model: "gemini-pro",
+          maxTokens: 1000,
+          temperature: 0.7,
+          enabled: false,
+        },
+        internetAccess: {
+          enabled: false,
+          searchEngine: "google",
+          apiKey: "",
+          maxQueries: 100,
+        },
+        whatsapp: {
+          enabled: true,
+          maxConnections: 2,
+          webhookUrl: "",
+        },
+      },
+      tokenUsage: {
+        openai: { used: 2340, limit: 25000, cost: 3.51 },
+        gemini: { used: 0, limit: 0, cost: 0 },
+        internetQueries: { used: 0, limit: 100 },
+        whatsappMessages: { sent: 234, received: 456, limit: 5000 },
+      },
       features: {
         whatsappIntegration: true,
         sentimentAnalysis: true,
         aiSuggestions: false,
         customReports: false,
         apiAccess: false,
+        internetAccess: false,
+        aiChat: true,
       },
       consumption: {
         messages: 3420,
@@ -97,6 +170,7 @@ export default function MasterControlPanel() {
         aiAnalysisPerMonth: 5000,
         reportsPerMonth: 100,
         storageGB: 5,
+        tokensPerMonth: 25000,
       },
     },
     {
@@ -112,12 +186,47 @@ export default function MasterControlPanel() {
       maxApiCalls: 1000,
       createdAt: "2023-12-01",
       expiresAt: "2024-01-31",
+      apiConfig: {
+        openai: {
+          apiKey: "",
+          model: "gpt-3.5-turbo",
+          maxTokens: 500,
+          temperature: 0.7,
+          enabled: false,
+        },
+        gemini: {
+          apiKey: "",
+          model: "gemini-pro",
+          maxTokens: 500,
+          temperature: 0.7,
+          enabled: false,
+        },
+        internetAccess: {
+          enabled: false,
+          searchEngine: "google",
+          apiKey: "",
+          maxQueries: 50,
+        },
+        whatsapp: {
+          enabled: false,
+          maxConnections: 1,
+          webhookUrl: "",
+        },
+      },
+      tokenUsage: {
+        openai: { used: 890, limit: 5000, cost: 1.34 },
+        gemini: { used: 0, limit: 0, cost: 0 },
+        internetQueries: { used: 0, limit: 50 },
+        whatsappMessages: { sent: 0, received: 0, limit: 1000 },
+      },
       features: {
         whatsappIntegration: false,
         sentimentAnalysis: false,
         aiSuggestions: false,
         customReports: false,
         apiAccess: false,
+        internetAccess: false,
+        aiChat: false,
       },
       consumption: {
         messages: 890,
@@ -130,6 +239,7 @@ export default function MasterControlPanel() {
         aiAnalysisPerMonth: 0,
         reportsPerMonth: 20,
         storageGB: 1,
+        tokensPerMonth: 5000,
       },
     },
   ])
@@ -196,6 +306,11 @@ export default function MasterControlPanel() {
 
   const selectedClientData = clients.find((c) => c.id === selectedClient)
   const healthStatus = getHealthStatus(systemHealth.status)
+
+  const handleSaveClientConfig = (clientId: string, config: any) => {
+    setClients(clients.map((client) => (client.id === clientId ? { ...client, ...config } : client)))
+    console.log(`Configurações salvas para cliente ${clientId}:`, config)
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -299,10 +414,11 @@ export default function MasterControlPanel() {
         </div>
 
         <Tabs defaultValue="clients" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="clients">Clientes</TabsTrigger>
+            <TabsTrigger value="api-manager">APIs & IA</TabsTrigger>
             <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
-            <TabsTrigger value="ai-config">Config IA</TabsTrigger>
+            <TabsTrigger value="ai-config">Config Global</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="system">Sistema</TabsTrigger>
           </TabsList>
@@ -342,10 +458,11 @@ export default function MasterControlPanel() {
                             </div>
                             <div>
                               <p className="text-gray-600">
-                                WhatsApp: {client.whatsappConnections}/{client.maxWhatsappConnections}
+                                Tokens: {client.tokenUsage.openai.used.toLocaleString()}/
+                                {client.limits.tokensPerMonth.toLocaleString()}
                               </p>
                               <Progress
-                                value={(client.whatsappConnections / client.maxWhatsappConnections) * 100}
+                                value={(client.tokenUsage.openai.used / client.limits.tokensPerMonth) * 100}
                                 className="h-2 mt-1"
                               />
                             </div>
@@ -357,8 +474,10 @@ export default function MasterControlPanel() {
                               <div className="text-gray-600">Mensagens</div>
                             </div>
                             <div className="text-center p-2 bg-green-50 rounded">
-                              <div className="font-bold">{client.consumption.aiAnalysis.toLocaleString()}</div>
-                              <div className="text-gray-600">IA Análises</div>
+                              <div className="font-bold">
+                                ${(client.tokenUsage.openai.cost + client.tokenUsage.gemini.cost).toFixed(2)}
+                              </div>
+                              <div className="text-gray-600">Custo APIs</div>
                             </div>
                             <div className="text-center p-2 bg-purple-50 rounded">
                               <div className="font-bold">{client.consumption.reports}</div>
@@ -402,6 +521,23 @@ export default function MasterControlPanel() {
                         <div className="space-y-3">
                           <div>
                             <div className="flex justify-between text-sm mb-1">
+                              <span>Tokens OpenAI</span>
+                              <span>
+                                {selectedClientData.tokenUsage.openai.used.toLocaleString()}/
+                                {selectedClientData.limits.tokensPerMonth.toLocaleString()}
+                              </span>
+                            </div>
+                            <Progress
+                              value={
+                                (selectedClientData.tokenUsage.openai.used / selectedClientData.limits.tokensPerMonth) *
+                                100
+                              }
+                              className="h-2"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
                               <span>Mensagens</span>
                               <span>
                                 {selectedClientData.consumption.messages.toLocaleString()}/
@@ -411,24 +547,6 @@ export default function MasterControlPanel() {
                             <Progress
                               value={
                                 (selectedClientData.consumption.messages / selectedClientData.limits.messagesPerMonth) *
-                                100
-                              }
-                              className="h-2"
-                            />
-                          </div>
-
-                          <div>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span>Análises IA</span>
-                              <span>
-                                {selectedClientData.consumption.aiAnalysis.toLocaleString()}/
-                                {selectedClientData.limits.aiAnalysisPerMonth.toLocaleString()}
-                              </span>
-                            </div>
-                            <Progress
-                              value={
-                                (selectedClientData.consumption.aiAnalysis /
-                                  selectedClientData.limits.aiAnalysisPerMonth) *
                                 100
                               }
                               className="h-2"
@@ -455,15 +573,14 @@ export default function MasterControlPanel() {
                       <Separator />
 
                       <div>
-                        <h4 className="font-medium mb-2">Funcionalidades</h4>
-                        <div className="space-y-2">
-                          {Object.entries(selectedClientData.features).map(([feature, enabled]) => (
-                            <div key={feature} className="flex items-center justify-between">
-                              <span className="text-sm capitalize">{feature.replace(/([A-Z])/g, " $1")}</span>
-                              <Badge variant={enabled ? "default" : "secondary"}>{enabled ? "Ativo" : "Inativo"}</Badge>
-                            </div>
-                          ))}
+                        <h4 className="font-medium mb-2">Custo Total APIs</h4>
+                        <div className="text-2xl font-bold text-green-600">
+                          $
+                          {(
+                            selectedClientData.tokenUsage.openai.cost + selectedClientData.tokenUsage.gemini.cost
+                          ).toFixed(2)}
                         </div>
+                        <div className="text-sm text-gray-600">Este mês</div>
                       </div>
 
                       <Separator />
@@ -483,6 +600,27 @@ export default function MasterControlPanel() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Gerenciador Individual de APIs */}
+          <TabsContent value="api-manager">
+            {selectedClientData ? (
+              <ClientAPIManager
+                clientId={selectedClientData.id}
+                clientName={selectedClientData.name}
+                onSave={handleSaveClientConfig}
+              />
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Key className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium mb-2">Selecione um Cliente</h3>
+                  <p className="text-gray-600">
+                    Escolha um cliente na aba "Clientes" para gerenciar suas APIs individuais e configurar a IA Maestro
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* WhatsApp Management */}
@@ -511,7 +649,7 @@ export default function MasterControlPanel() {
             </div>
           </TabsContent>
 
-          {/* AI Configuration */}
+          {/* AI Configuration Global */}
           <TabsContent value="ai-config">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
@@ -602,37 +740,52 @@ export default function MasterControlPanel() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Configurações por Cliente</CardTitle>
+                  <CardTitle>Resumo do Sistema</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {selectedClientData ? (
-                    <div className="space-y-4">
-                      <h4 className="font-medium">{selectedClientData.name}</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Análise de Sentimentos</span>
-                          <Switch checked={selectedClientData.features.sentimentAnalysis} />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-900">{clients.length}</div>
+                        <div className="text-sm text-blue-700">Clientes Total</div>
+                      </div>
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-900">
+                          {clients.filter((c) => c.status === "active").length}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Sugestões IA</span>
-                          <Switch checked={selectedClientData.features.aiSuggestions} />
+                        <div className="text-sm text-green-700">Ativos</div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div>
+                      <h4 className="font-medium mb-2">Uso Total de APIs</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>OpenAI:</span>
+                          <span className="font-medium">
+                            {clients.reduce((acc, c) => acc + c.tokenUsage.openai.used, 0).toLocaleString()} tokens
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Relatórios Customizados</span>
-                          <Switch checked={selectedClientData.features.customReports} />
+                        <div className="flex justify-between text-sm">
+                          <span>Gemini:</span>
+                          <span className="font-medium">
+                            {clients.reduce((acc, c) => acc + c.tokenUsage.gemini.used, 0).toLocaleString()} tokens
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm">Acesso API</span>
-                          <Switch checked={selectedClientData.features.apiAccess} />
+                        <div className="flex justify-between text-sm">
+                          <span>Custo Total:</span>
+                          <span className="font-medium text-green-600">
+                            $
+                            {clients
+                              .reduce((acc, c) => acc + c.tokenUsage.openai.cost + c.tokenUsage.gemini.cost, 0)
+                              .toFixed(2)}
+                          </span>
                         </div>
                       </div>
-                      <Button className="w-full bg-transparent" variant="outline">
-                        Salvar Configurações do Cliente
-                      </Button>
                     </div>
-                  ) : (
-                    <p className="text-gray-500 text-center py-8">Selecione um cliente para configurar</p>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -684,9 +837,15 @@ export default function MasterControlPanel() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm">Análise de Sentimentos</span>
+                      <span className="text-sm">APIs Configuradas</span>
                       <span className="text-sm font-medium">
-                        {clients.reduce((acc, c) => acc + c.consumption.aiAnalysis, 0).toLocaleString()}
+                        {clients.reduce((acc, c) => {
+                          let count = 0
+                          if (c.apiConfig.openai?.enabled) count++
+                          if (c.apiConfig.gemini?.enabled) count++
+                          if (c.apiConfig.internetAccess?.enabled) count++
+                          return acc + count
+                        }, 0)}
                       </span>
                     </div>
                     <div className="flex justify-between items-center">

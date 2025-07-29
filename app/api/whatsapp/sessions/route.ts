@@ -23,14 +23,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name } = body
+    const { name, clientId } = body
+
+    // Gerar QR Code usando uma biblioteca de QR Code
+    const qrData = `whatsapp-session-${name}-${Date.now()}`
+    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`
 
     // Criar nova sessão
     const newSession = {
       id: `session_${Date.now()}`,
       name: name || `session_${Date.now()}`,
+      clientId: clientId,
       status: "SCAN_QR_CODE",
-      qr: `/placeholder.svg?height=200&width=200&text=QR+Code+WhatsApp`,
+      qr: qrCodeUrl,
       createdAt: new Date().toISOString(),
       lastActivity: new Date().toISOString(),
       config: {
@@ -40,7 +45,7 @@ export async function POST(request: NextRequest) {
 
     sessions.push(newSession)
 
-    // Simular conexão após 10 segundos
+    // Simular conexão após 15 segundos (tempo real seria baseado no scan do QR)
     setTimeout(() => {
       const sessionIndex = sessions.findIndex((s) => s.id === newSession.id)
       if (sessionIndex !== -1) {
@@ -48,14 +53,15 @@ export async function POST(request: NextRequest) {
           ...sessions[sessionIndex],
           status: "WORKING",
           qr: undefined,
+          phone: "+55 11 99999-9999",
           me: {
-            id: "demo@whatsapp.com",
-            pushName: "IA Powers Demo",
-            name: "IA Powers Demo",
+            id: `${clientId}@whatsapp.com`,
+            pushName: `Cliente ${clientId}`,
+            name: `Cliente ${clientId}`,
           },
         }
       }
-    }, 10000)
+    }, 15000)
 
     return NextResponse.json({
       success: true,

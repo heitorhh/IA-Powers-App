@@ -114,28 +114,45 @@ export default function WhatsAppUniversal({ userRole, clientId, canConnect = tru
     setError(null)
 
     try {
-      // Simular processo de conexão
-      setSession({
-        name: `session_${clientId}_${Date.now()}`,
-        status: "SCAN_QR_CODE",
-        qr: `/placeholder.svg?height=200&width=200&text=QR+Code+WhatsApp`,
+      // Chamar API para criar sessão WhatsApp
+      const response = await fetch("/api/whatsapp/sessions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: `session_${clientId}_${Date.now()}`,
+          clientId: clientId,
+        }),
       })
 
-      // Simular conexão após 10 segundos
-      setTimeout(() => {
-        setSession({
-          name: `session_${clientId}_${Date.now()}`,
-          status: "WORKING",
-          phone: "+55 11 99999-9999",
-          me: {
-            id: "demo@whatsapp.com",
-            pushName: "Empresa Demo",
-            name: "Empresa Demo",
-          },
-        })
-      }, 10000)
+      const data = await response.json()
+
+      if (data.success) {
+        setSession(data.session)
+
+        // Polling para verificar status da conexão
+        const checkStatus = setInterval(async () => {
+          const statusResponse = await fetch(`/api/whatsapp/sessions/${data.session.name}`)
+          const statusData = await statusResponse.json()
+
+          if (statusData.success) {
+            setSession(statusData.session)
+
+            if (statusData.session.status === "WORKING") {
+              clearInterval(checkStatus)
+            }
+          }
+        }, 3000)
+
+        // Limpar polling após 5 minutos
+        setTimeout(() => clearInterval(checkStatus), 300000)
+      } else {
+        setError(data.error || "Erro ao conectar")
+      }
     } catch (error) {
-      setError("Erro ao conectar WhatsApp")
+      setError("Erro de conexão")
+      console.error("Erro:", error)
     } finally {
       setIsConnecting(false)
     }
@@ -269,19 +286,38 @@ export default function WhatsAppUniversal({ userRole, clientId, canConnect = tru
             <div className="text-center py-8">
               <div className="bg-white p-4 rounded-lg border-2 border-dashed border-gray-300 inline-block mb-4">
                 {session.qr ? (
-                  <img src={session.qr || "/placeholder.svg"} alt="QR Code WhatsApp" className="w-48 h-48 mx-auto" />
+                  <div className="w-48 h-48 flex items-center justify-center">
+                    <img
+                      src={session.qr || "/placeholder.svg"}
+                      alt="QR Code WhatsApp"
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        // Fallback para QR placeholder se a imagem falhar
+                        e.currentTarget.src = `/placeholder.svg?height=200&width=200&text=QR+Code+WhatsApp`
+                      }}
+                    />
+                  </div>
                 ) : (
                   <div className="w-48 h-48 bg-gray-100 flex items-center justify-center">
                     <QrCode className="w-16 h-16 text-gray-400" />
+                    <div className="ml-2 text-sm text-gray-500">Gerando QR...</div>
                   </div>
                 )}
               </div>
               <h3 className="text-lg font-medium mb-2">Escaneie o QR Code</h3>
-              <p className="text-gray-600 mb-4">Abra o WhatsApp no seu celular e escaneie o código acima</p>
+              <p className="text-gray-600 mb-4">
+                1. Abra o WhatsApp no seu celular
+                <br />
+                2. Toque em "Dispositivos conectados"
+                <br />
+                3. Toque em "Conectar um dispositivo"
+                <br />
+                4. Escaneie este código
+              </p>
               <div className="flex justify-center space-x-2">
-                <Button variant="outline" onClick={() => setSession({ ...session, qr: session.qr })}>
+                <Button variant="outline" onClick={() => window.location.reload()}>
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Atualizar QR
+                  Novo QR Code
                 </Button>
                 <Button variant="destructive" onClick={disconnectWhatsApp}>
                   Cancelar
