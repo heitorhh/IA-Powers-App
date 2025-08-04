@@ -1,100 +1,76 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getEvolutionManager } from "@/lib/evolution-api"
+import { NextRequest, NextResponse } from 'next/server'
+import { evolutionAPI } from '@/lib/evolution-api'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url)
-    const instanceName = searchParams.get("instanceName")
-
-    const manager = getEvolutionManager()
-
-    if (instanceName) {
-      // Buscar instância específica
-      const api = manager.getInstance(instanceName)
-      const instance = await api.getInstanceStatus(instanceName)
-
-      return NextResponse.json({
-        success: true,
-        instance,
-      })
-    } else {
-      // Listar todas as instâncias
-      const api = manager.getInstance("temp") // Usar instância temporária para listar
-      const instances = await api.getAllInstances()
-
-      return NextResponse.json({
-        success: true,
-        instances,
-      })
+    // Verificar se a API está funcionando
+    const isHealthy = await evolutionAPI.healthCheck()
+    
+    if (!isHealthy) {
+      return NextResponse.json(
+        { error: 'Evolution API is not available' },
+        { status: 503 }
+      )
     }
+
+    const instances = evolutionAPI.getAllInstances()
+    
+    return NextResponse.json({
+      success: true,
+      instances,
+      count: instances.length
+    })
   } catch (error) {
-    console.error("Evolution API Error:", error)
+    console.error('Error fetching instances:', error)
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Erro ao buscar instâncias",
-      },
-      { status: 500 },
+      { error: 'Failed to fetch instances' },
+      { status: 500 }
     )
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { instanceName, clientId, userRole, webhookUrl } = body
+    const { instanceName } = await request.json()
 
     if (!instanceName) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Nome da instância é obrigatório",
-        },
-        { status: 400 },
+        { error: 'Instance name is required' },
+        { status: 400 }
       )
     }
 
-    const manager = getEvolutionManager()
-    const api = manager.getInstance(instanceName)
-
-    // URL do webhook personalizada
-    const webhook = webhookUrl || `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/evolution/webhook`
-
-    // Criar instância
-    const instance = await api.createInstance(instanceName, webhook)
-
-    // Conectar instância (gerar QR Code)
-    await api.connectInstance(instanceName)
-
-    // Buscar QR Code
-    let qrData = null
-    try {
-      const qr = await api.getQRCode(instanceName)
-      qrData = qr
-    } catch (error) {
-      console.log("QR Code ainda não disponível, será gerado em breve")
+    // Verificar se a API está funcionando
+    const isHealthy = await evolutionAPI.healthCheck()
+    
+    if (!isHealthy) {
+      return NextResponse.json(
+        { error: 'Evolution API is not available. Please check Railway deployment.' },
+        { status: 503 }
+      )
     }
 
+    const instance = await evolutionAPI.createInstance(instanceName)
+    
     return NextResponse.json({
       success: true,
-      instance: {
-        instanceName,
-        clientId,
-        userRole,
-        status: instance.status || "connecting",
-        qr: qrData?.base64 ? `data:image/png;base64,${qrData.base64}` : null,
-        createdAt: new Date().toISOString(),
-      },
-      message: "Instância Evolution API criada com sucesso",
+      instance,
+      message: 'Instance created successfully'
     })
   } catch (error) {
-    console.error("Erro ao criar instância:", error)
+    console.error('Error creating instance:', error)
+    
+    // Retornar erro mais específico
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 }
+      )
+    }
+    
     return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Erro ao criar instância",
-      },
-      { status: 500 },
+      { error: 'Failed to create instance' },
+      { status: 500 }
     )
   }
 }
