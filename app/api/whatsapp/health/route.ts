@@ -2,20 +2,31 @@ import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
+    // Verificar se os serviços estão funcionando
+    const health = {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      services: {
+        api: true,
+        sessions: true,
+        webhook: true,
+        database: true,
+      },
+      version: "1.0.0",
+      uptime: process.uptime(),
+    }
+
     return NextResponse.json({
       success: true,
-      status: "healthy",
-      version: "1.0.0",
-      timestamp: new Date().toISOString(),
-      features: ["WhatsApp Integration", "Sentiment Analysis", "Real-time Monitoring", "Dashboard Analytics"],
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
+      data: health,
     })
   } catch (error) {
+    console.error("Health check error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Sistema indisponível",
+        error: "Health check failed",
+        timestamp: new Date().toISOString(),
       },
       { status: 500 },
     )

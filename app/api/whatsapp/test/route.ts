@@ -1,33 +1,66 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
 export async function GET() {
   try {
-    // Testar geração de QR Code
+    // Simular dados de teste
     const testData = {
-      sessionId: `test_${Date.now()}`,
-      clientId: "test",
-      timestamp: Date.now(),
-      server: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      message: "WhatsApp API está funcionando!",
+      timestamp: new Date().toISOString(),
+      endpoints: {
+        sessions: "/api/whatsapp/sessions",
+        messages: "/api/whatsapp/messages",
+        chats: "/api/whatsapp/chats",
+        webhook: "/api/webhook/whatsapp",
+        health: "/api/whatsapp/health",
+      },
+      features: [
+        "Criação de sessões",
+        "Geração de QR Code",
+        "Envio de mensagens",
+        "Recebimento via webhook",
+        "Análise de sentimentos",
+        "Monitoramento de conversas",
+      ],
     }
-
-    const qrData = JSON.stringify(testData)
-    const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&format=png&data=${encodeURIComponent(qrData)}`
 
     return NextResponse.json({
       success: true,
-      message: "API WhatsApp funcionando corretamente",
-      test: {
-        qrCodeUrl,
-        qrData,
-        timestamp: new Date().toISOString(),
-      },
+      data: testData,
     })
   } catch (error) {
+    console.error("Test endpoint error:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Erro no teste da API WhatsApp",
-        details: error instanceof Error ? error.message : "Erro desconhecido",
+        error: "Test endpoint failed",
+      },
+      { status: 500 },
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    
+    // Simular processamento de teste
+    const result = {
+      received: body,
+      processed: true,
+      timestamp: new Date().toISOString(),
+      testId: `test_${Date.now()}`,
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: result,
+    })
+  } catch (error) {
+    console.error("Test POST error:", error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Test POST failed",
       },
       { status: 500 },
     )

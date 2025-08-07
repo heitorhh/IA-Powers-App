@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import SimpleUserInterface from "./components/simple-user-interface"
 import LeaderInterface from "./components/leader-interface"
 import MasterControlPanel from "./components/master-control-panel"
+import ThreeColumnWorkspace from "./components/three-column-workspace"
 
 // Mock users for demo
 const mockUsers = {
@@ -82,6 +83,7 @@ const mockUsers = {
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<"default" | "workspace">("default")
 
   useEffect(() => {
     // For demo purposes, default to simple user
@@ -132,6 +134,14 @@ export default function Dashboard() {
           Master
         </button>
       </div>
+      <div className="mt-2 pt-2 border-t">
+        <button
+          onClick={() => setViewMode(viewMode === "workspace" ? "default" : "workspace")}
+          className={`px-2 py-1 text-xs rounded w-full ${viewMode === "workspace" ? "bg-green-500 text-white" : "bg-gray-100"}`}
+        >
+          {viewMode === "workspace" ? "Interface Padrão" : "Workspace 3 Colunas"}
+        </button>
+      </div>
     </div>
   )
 
@@ -139,9 +149,15 @@ export default function Dashboard() {
   return (
     <>
       <DemoSwitcher />
-      {user.role === "simple" && <SimpleUserInterface />}
-      {user.role === "leader" && <LeaderInterface userProfile={user} />}
-      {user.role === "master" && <MasterControlPanel />}
+      {viewMode === "workspace" ? (
+        <ThreeColumnWorkspace user={user} />
+      ) : (
+        <>
+          {user.role === "simple" && <SimpleUserInterface />}
+          {user.role === "leader" && <LeaderInterface userProfile={user} />}
+          {user.role === "master" && <MasterControlPanel />}
+        </>
+      )}
     </>
   )
 }

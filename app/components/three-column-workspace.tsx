@@ -1,259 +1,427 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import {
-  MessageSquare,
-  Send,
-  Search,
-  Phone,
-  Video,
-  MoreVertical,
-  Target,
-  TrendingUp,
-  User,
-  Bot,
-  Smile,
-  Frown,
-  Meh,
-  AlertTriangle,
-  Clock,
-  Star,
-} from "lucide-react"
-import AIChat from "./ai-chat"
-import WhatsAppConnection from "./whatsapp-connection"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { MessageSquare, Send, Search, Users, CheckCircle, Clock, AlertTriangle, TrendingUp, Brain, Smartphone, QrCode, RefreshCw, CheckCircle2, AlertCircle, WifiOff, Wifi, User, Bot, ArrowRight, Target, Lightbulb, Calendar, BarChart3 } from 'lucide-react'
+import NotificationCenter from './notification-center'
 
-interface Conversation {
+interface User {
   id: string
   name: string
+  role: "simple" | "leader" | "master"
+  clientId: string
+}
+
+interface Person {
+  id: string
+  name: string
+  avatar: string
+  status: "online" | "offline" | "away"
   lastMessage: string
   timestamp: string
-  unread: number
-  avatar: string
   sentiment: "positive" | "negative" | "neutral"
   priority: "high" | "medium" | "low"
-  status: "online" | "offline" | "away"
+  unreadCount: number
 }
 
 interface Task {
   id: string
   title: string
-  description: string
-  priority: "high" | "medium" | "low"
-  status: "pending" | "in-progress" | "completed"
-  dueDate: string
   assignedBy?: string
-  category: string
+  assignedTo?: string
+  status: "pending" | "in_progress" | "completed"
+  priority: "high" | "medium" | "low"
+  dueDate: string
+  needsFollowUp?: boolean
 }
 
-interface AISuggestion {
+interface Message {
   id: string
-  type: "communication" | "priority" | "productivity" | "disc"
-  title: string
   content: string
-  targetPerson?: string
-  icon: any
+  sender: "user" | "ai" | string
+  timestamp: string
+  type: "text"
+}
+
+interface WhatsAppSession {
+  id: string
+  name: string
+  status: "INITIALIZING" | "SCAN_QR_CODE" | "WORKING" | "EXPIRED" | "DISCONNECTED"
+  qr?: string
+  expiresAt?: string
+  me?: {
+    id: string
+    pushName: string
+    name: string
+    phone: string
+  }
 }
 
 interface ThreeColumnWorkspaceProps {
-  userRole: "simple" | "leader"
-  userProfile?: any
+  user: User
 }
 
-export default function ThreeColumnWorkspace({ userRole, userProfile }: ThreeColumnWorkspaceProps) {
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null)
-  const [chatMode, setChatMode] = useState<"ai" | "person">("ai")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: "1",
-      title: "Finalizar relatório mensal",
-      description: "Completar análise de vendas do mês anterior",
-      priority: "high",
-      status: "pending",
-      dueDate: "2024-01-15",
-      assignedBy: "Carlos Mendes",
-      category: "Relatórios",
-    },
-    {
-      id: "2",
-      title: "Revisar proposta comercial",
-      description: "Analisar proposta para cliente ABC Corp",
-      priority: "medium",
-      status: "in-progress",
-      dueDate: "2024-01-18",
-      assignedBy: "Maria Santos",
-      category: "Comercial",
-    },
-    {
-      id: "3",
-      title: "Atualizar planilha de controle",
-      description: "Inserir dados da semana no sistema",
-      priority: "low",
-      status: "pending",
-      dueDate: "2024-01-20",
-      assignedBy: "Carlos Mendes",
-      category: "Administrativo",
-    },
-  ])
+export default function ThreeColumnWorkspace({ user }: ThreeColumnWorkspaceProps) {
+  // Add safety check for user
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
 
-  const [conversations] = useState<Conversation[]>([
+  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
+  const [chatMode, setChatMode] = useState<"ai" | "person">("ai")
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState("")
+  const [searchTerm, setSearchTerm] = useState("")
+  const [whatsappSession, setWhatsappSession] = useState<WhatsAppSession | null>(null)
+  const [isConnectingWhatsApp, setIsConnectingWhatsApp] = useState(false)
+  const [whatsappError, setWhatsappError] = useState<string | null>(null)
+  const [timeLeft, setTimeLeft] = useState<number>(0)
+
+  // Mock data
+  const [people] = useState<Person[]>([
     {
       id: "1",
       name: "Carlos Mendes",
-      lastMessage: "Preciso do relatório até amanhã, por favor",
-      timestamp: "14:30",
-      unread: 2,
-      avatar: "/placeholder.svg?height=40&width=40",
+      avatar: "/placeholder.svg?height=40&width=40&text=CM",
+      status: "online",
+      lastMessage: "Preciso urgente do relatório financeiro...",
+      timestamp: "2 min",
       sentiment: "negative",
       priority: "high",
-      status: "online",
+      unreadCount: 3,
     },
     {
       id: "2",
       name: "Ana Silva",
-      lastMessage: "Ótima apresentação hoje! 👏",
-      timestamp: "13:45",
-      unread: 0,
-      avatar: "/placeholder.svg?height=40&width=40",
-      sentiment: "positive",
-      priority: "low",
+      avatar: "/placeholder.svg?height=40&width=40&text=AS",
       status: "online",
+      lastMessage: "Ótima apresentação hoje! Parabéns 👏",
+      timestamp: "15 min",
+      sentiment: "positive",
+      priority: "medium",
+      unreadCount: 0,
     },
     {
       id: "3",
       name: "João Santos",
-      lastMessage: "Estou com dificuldades neste projeto...",
-      timestamp: "12:20",
-      unread: 1,
-      avatar: "/placeholder.svg?height=40&width=40",
-      sentiment: "negative",
-      priority: "medium",
+      avatar: "/placeholder.svg?height=40&width=40&text=JS",
       status: "away",
+      lastMessage: "Estou muito estressado com essas demandas...",
+      timestamp: "1h",
+      sentiment: "negative",
+      priority: "high",
+      unreadCount: 1,
     },
     {
       id: "4",
       name: "Maria Costa",
-      lastMessage: "Vamos marcar uma reunião?",
-      timestamp: "11:15",
-      unread: 0,
-      avatar: "/placeholder.svg?height=40&width=40",
+      avatar: "/placeholder.svg?height=40&width=40&text=MC",
+      status: "offline",
+      lastMessage: "Vou entregar o projeto amanhã cedo",
+      timestamp: "3h",
       sentiment: "neutral",
       priority: "medium",
-      status: "offline",
-    },
-    {
-      id: "5",
-      name: "Equipe Marketing",
-      lastMessage: "Campanha aprovada! Vamos começar",
-      timestamp: "10:30",
-      unread: 3,
-      avatar: "/placeholder.svg?height=40&width=40",
-      sentiment: "positive",
-      priority: "high",
-      status: "online",
+      unreadCount: 0,
     },
   ])
 
-  const [aiSuggestions] = useState<AISuggestion[]>([
+  const [tasks] = useState<Task[]>([
     {
       id: "1",
-      type: "communication",
-      title: "Dica para Carlos",
-      content: "Carlos tem perfil D (Dominante). Seja direto: 'Relatório será entregue às 16h hoje.' Evite rodeios.",
-      targetPerson: "Carlos Mendes",
-      icon: MessageSquare,
+      title: "Revisar relatório mensal",
+      assignedBy: user.role === "simple" ? "Ana Silva" : undefined,
+      assignedTo: user.role !== "simple" ? "Carlos Mendes" : undefined,
+      status: "pending",
+      priority: "high",
+      dueDate: "Hoje",
+      needsFollowUp: user.role !== "simple",
     },
     {
       id: "2",
-      type: "priority",
-      title: "Priorização Inteligente",
-      content: "Baseado na urgência e seu perfil, sugiro: 1º Relatório (Carlos), 2º Proposta, 3º Planilha.",
-      icon: Target,
+      title: "Preparar apresentação Q4",
+      assignedBy: user.role === "simple" ? "João Santos" : undefined,
+      assignedTo: user.role !== "simple" ? "Maria Costa" : undefined,
+      status: "in_progress",
+      priority: "medium",
+      dueDate: "Amanhã",
     },
     {
       id: "3",
-      type: "disc",
-      title: "Perfil João Santos",
-      content: "João demonstra características S (Estável). Ofereça suporte: 'Posso ajudar com o projeto?'",
-      targetPerson: "João Santos",
-      icon: User,
-    },
-    {
-      id: "4",
-      type: "productivity",
-      title: "Técnica Pomodoro",
-      content: "Para o relatório: 25min focado + 5min pausa. Sua produtividade aumenta 40% com blocos de tempo.",
-      icon: TrendingUp,
+      title: "Análise de performance da equipe",
+      assignedBy: user.role === "simple" ? "Diretor" : undefined,
+      assignedTo: user.role !== "simple" ? "João Santos" : undefined,
+      status: "completed",
+      priority: "low",
+      dueDate: "Ontem",
     },
   ])
 
-  const [whatsappConnected, setWhatsappConnected] = useState(false)
+  // WhatsApp Timer
+  useEffect(() => {
+    if (whatsappSession && whatsappSession.status === "SCAN_QR_CODE" && whatsappSession.expiresAt) {
+      const updateTimer = () => {
+        const now = new Date().getTime()
+        const expires = new Date(whatsappSession.expiresAt!).getTime()
+        const remaining = Math.max(0, expires - now)
+        setTimeLeft(Math.floor(remaining / 1000))
 
-  const handleTaskToggle = (taskId: string) => {
-    setTasks(
-      tasks.map((task) =>
-        task.id === taskId ? { ...task, status: task.status === "completed" ? "pending" : "completed" } : task,
-      ),
-    )
+        if (remaining <= 0) {
+          setWhatsappSession({ ...whatsappSession, status: "EXPIRED" })
+        }
+      }
+
+      updateTimer()
+      const interval = setInterval(updateTimer, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [whatsappSession])
+
+  // WhatsApp Status Polling
+  useEffect(() => {
+    if (whatsappSession && (whatsappSession.status === "SCAN_QR_CODE" || whatsappSession.status === "INITIALIZING")) {
+      const interval = setInterval(() => {
+        checkWhatsAppStatus()
+      }, 3000)
+
+      return () => clearInterval(interval)
+    }
+  }, [whatsappSession])
+
+  const checkWhatsAppStatus = async () => {
+    if (!whatsappSession) return
+
+    try {
+      const response = await fetch(`/api/whatsapp/sessions/${whatsappSession.name}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setWhatsappSession(data.session)
+        if (data.session.status === "WORKING") {
+          setWhatsappError(null)
+        }
+      }
+    } catch (error) {
+      console.error("Erro ao verificar status:", error)
+    }
   }
 
-  const getSentimentIcon = (sentiment: string) => {
+  const connectWhatsApp = async () => {
+    if (!user) return
+    
+    setIsConnectingWhatsApp(true)
+    setWhatsappError(null)
+
+    try {
+      const response = await fetch("/api/whatsapp/sessions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: `whatsapp_${user.role}_${Date.now()}`,
+          clientId: user.clientId || `client_${user.id}`,
+          userRole: user.role,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setWhatsappSession(data.session)
+        setWhatsappError(null)
+      } else {
+        setWhatsappError(data.error || "Erro ao gerar QR Code")
+      }
+    } catch (error) {
+      setWhatsappError("Erro de conexão com o servidor")
+      console.error("Erro:", error)
+    } finally {
+      setIsConnectingWhatsApp(false)
+    }
+  }
+
+  const disconnectWhatsApp = async () => {
+    if (!whatsappSession) return
+
+    try {
+      const response = await fetch(`/api/whatsapp/sessions/${whatsappSession.name}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        setWhatsappSession(null)
+        setWhatsappError(null)
+      }
+    } catch (error) {
+      console.error("Erro ao desconectar:", error)
+    }
+  }
+
+  const refreshQRCode = () => {
+    if (whatsappSession) {
+      setWhatsappSession(null)
+    }
+    connectWhatsApp()
+  }
+
+  const getAIName = () => {
+    if (!user) return "Assistente"
+    switch (user.role) {
+      case "simple":
+        return "Sofia"
+      case "leader":
+        return "Helena"
+      case "master":
+        return "Alexandra"
+      default:
+        return "Assistente"
+    }
+  }
+
+  const getAIPersonality = () => {
+    if (!user) return "Assistente inteligente"
+    switch (user.role) {
+      case "simple":
+        return "Sua assistente pessoal focada em produtividade"
+      case "leader":
+        return "Especialista em gestão de equipes e liderança"
+      case "master":
+        return "Consultora estratégica para alta gestão"
+      default:
+        return "Assistente inteligente"
+    }
+  }
+
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return
+
+    const message: Message = {
+      id: Date.now().toString(),
+      content: newMessage,
+      sender: "user",
+      timestamp: new Date().toLocaleTimeString(),
+      type: "text",
+    }
+
+    setMessages((prev) => [...prev, message])
+    setNewMessage("")
+
+    // Simulate AI response
+    if (chatMode === "ai") {
+      setTimeout(() => {
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          content: getAIResponse(newMessage),
+          sender: "ai",
+          timestamp: new Date().toLocaleTimeString(),
+          type: "text",
+        }
+        setMessages((prev) => [...prev, aiResponse])
+      }, 1000)
+    }
+  }
+
+  const getAIResponse = (userMessage: string): string => {
+    if (!user) return "Desculpe, não consegui processar sua mensagem."
+  
+    const responses = {
+      simple: [
+        "Entendi! Vou te ajudar a organizar isso melhor. Que tal criarmos uma lista de prioridades?",
+        "Ótima pergunta! Baseado no seu perfil, sugiro focar primeiro nas tarefas mais urgentes.",
+        "Posso ver que você está se esforçando muito. Vamos encontrar uma forma mais eficiente de fazer isso.",
+      ],
+      leader: [
+        "Como líder, é importante você delegar essa tarefa. Que tal conversar com o Carlos sobre isso?",
+        "Vejo que sua equipe está com algumas demandas em atraso. Sugiro uma reunião de alinhamento.",
+        "Excelente insight! Isso pode impactar positivamente toda a equipe. Como planeja implementar?",
+      ],
+      master: [
+        "Essa decisão pode ter impacto estratégico. Vamos analisar os dados antes de prosseguir.",
+        "Considerando o cenário atual, sugiro uma abordagem mais conservadora neste trimestre.",
+        "Perfeito! Essa iniciativa está alinhada com nossos objetivos de longo prazo.",
+      ],
+    }
+
+    const roleResponses = responses[user.role] || responses.simple
+    return roleResponses[Math.floor(Math.random() * roleResponses.length)]
+  }
+
+  const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
       case "positive":
-        return <Smile className="h-4 w-4 text-green-500" />
+        return "text-green-600"
       case "negative":
-        return <Frown className="h-4 w-4 text-red-500" />
+        return "text-red-600"
       default:
-        return <Meh className="h-4 w-4 text-yellow-500" />
+        return "text-yellow-600"
     }
   }
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "high":
-        return "bg-red-100 text-red-800 border-red-200"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
-      case "low":
-        return "bg-green-100 text-green-800 border-green-200"
+  const getSentimentBadge = (sentiment: string) => {
+    switch (sentiment) {
+      case "positive":
+        return <Badge className="bg-green-100 text-green-800 text-xs">😊</Badge>
+      case "negative":
+        return <Badge className="bg-red-100 text-red-800 text-xs">😟</Badge>
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200"
+        return <Badge className="bg-yellow-100 text-yellow-800 text-xs">😐</Badge>
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-        return "bg-green-500"
-      case "away":
-        return "bg-yellow-500"
+  const getSubtleSuggestions = () => {
+    if (!user) return []
+    switch (user.role) {
+      case "simple":
+        return [
+          { icon: Target, text: "Foque na tarefa do Carlos primeiro", type: "priority" },
+          { icon: Clock, text: "15min de pausa pode aumentar sua produtividade", type: "wellness" },
+          { icon: Lightbulb, text: "Que tal organizar suas tarefas por energia necessária?", type: "tip" },
+        ]
+      case "leader":
+        return [
+          { icon: Users, text: "João precisa de apoio - sentimento negativo detectado", type: "team" },
+          { icon: TrendingUp, text: "Ana está motivada - bom momento para novos desafios", type: "opportunity" },
+          { icon: AlertTriangle, text: "3 tarefas delegadas precisam de follow-up", type: "action" },
+        ]
+      case "master":
+        return [
+          { icon: BarChart3, text: "Produtividade da equipe subiu 12% esta semana", type: "insight" },
+          { icon: Brain, text: "Padrão identificado: reuniões 2ª feira são 30% menos produtivas", type: "pattern" },
+          { icon: Calendar, text: "Momento ideal para implementar mudanças estratégicas", type: "timing" },
+        ]
       default:
-        return "bg-gray-400"
+        return []
     }
   }
 
-  const filteredConversations = conversations.filter((conv) =>
-    conv.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
 
-  const selectedConv = conversations.find((c) => c.id === selectedConversation)
+  const filteredPeople = people.filter((person) => person.name.toLowerCase().includes(searchTerm.toLowerCase()))
 
   return (
-    <div className="h-screen flex bg-gray-50">
-      {/* Coluna Esquerda - Conversas */}
+    <div className="flex h-screen bg-gray-50">
+      {/* Left Column - People List */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold mb-3">Conversas Monitoradas</h2>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
-              placeholder="Pesquisar conversas..."
+              placeholder="Buscar conversas..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -263,316 +431,424 @@ export default function ThreeColumnWorkspace({ userRole, userProfile }: ThreeCol
 
         <ScrollArea className="flex-1">
           <div className="p-2">
-            {filteredConversations.map((conversation) => (
+            {filteredPeople.map((person) => (
               <div
-                key={conversation.id}
-                className={`p-3 rounded-lg cursor-pointer transition-all hover:bg-gray-50 mb-2 ${
-                  selectedConversation === conversation.id ? "bg-blue-50 border border-blue-200" : ""
-                }`}
+                key={person.id}
                 onClick={() => {
-                  setSelectedConversation(conversation.id)
+                  setSelectedPerson(person)
                   setChatMode("person")
+                  setMessages([])
                 }}
+                className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                  selectedPerson?.id === person.id && chatMode === "person"
+                    ? "bg-blue-50 border border-blue-200"
+                    : "hover:bg-gray-50"
+                }`}
               >
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <img
-                      src={conversation.avatar || "/placeholder.svg"}
-                      alt={conversation.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <div
-                      className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(
-                        conversation.status,
-                      )}`}
-                    />
+                <div className="relative">
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={person.avatar || "/placeholder.svg"} alt={person.name} />
+                    <AvatarFallback>{person.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                  </Avatar>
+                  <div
+                    className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
+                      person.status === "online"
+                        ? "bg-green-500"
+                        : person.status === "away"
+                        ? "bg-yellow-500"
+                        : "bg-gray-400"
+                    }`}
+                  />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-medium text-gray-900 truncate">{person.name}</h3>
+                    <div className="flex items-center space-x-1">
+                      {getSentimentBadge(person.sentiment)}
+                      <span className="text-xs text-gray-500">{person.timestamp}</span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="font-medium text-sm truncate">{conversation.name}</h3>
-                      <div className="flex items-center space-x-1">
-                        {getSentimentIcon(conversation.sentiment)}
-                        <span className="text-xs text-gray-500">{conversation.timestamp}</span>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-600 truncate">{conversation.lastMessage}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <Badge className={getPriorityColor(conversation.priority)} variant="outline">
-                        {conversation.priority}
-                      </Badge>
-                      {conversation.unread > 0 && (
-                        <Badge className="bg-blue-500 text-white text-xs">{conversation.unread}</Badge>
-                      )}
-                    </div>
+                  <p className="text-sm text-gray-600 truncate">{person.lastMessage}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <Badge
+                      variant={person.priority === "high" ? "destructive" : person.priority === "medium" ? "default" : "secondary"}
+                      className="text-xs"
+                    >
+                      {person.priority}
+                    </Badge>
+                    {person.unreadCount > 0 && (
+                      <Badge className="bg-blue-600 text-white text-xs">{person.unreadCount}</Badge>
+                    )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
         </ScrollArea>
+      </div>
 
-        <div className="p-4 border-t border-gray-200">
-          <Button
-            onClick={() => {
-              setSelectedConversation(null)
-              setChatMode("ai")
-            }}
-            className={`w-full ${chatMode === "ai" ? "bg-blue-600" : "bg-gray-600"}`}
-          >
-            <Bot className="h-4 w-4 mr-2" />
-            Chat com IA
-          </Button>
+      {/* Center Column - Chat */}
+      <div className="flex-1 flex flex-col">
+        {/* Chat Header */}
+        <div className="bg-white border-b border-gray-200 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              {chatMode === "ai" ? (
+                <>
+                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                    <Bot className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-gray-900">{getAIName()}</h2>
+                    <p className="text-sm text-gray-600">{getAIPersonality()}</p>
+                  </div>
+                </>
+              ) : selectedPerson ? (
+                <>
+                  <Avatar className="w-10 h-10">
+                    <AvatarImage src={selectedPerson.avatar || "/placeholder.svg"} alt={selectedPerson.name} />
+                    <AvatarFallback>{selectedPerson.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="font-semibold text-gray-900">{selectedPerson.name}</h2>
+                    <p className="text-sm text-gray-600 capitalize">{selectedPerson.status}</p>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <h2 className="font-semibold text-gray-900">Selecione uma conversa</h2>
+                  <p className="text-sm text-gray-600">Escolha alguém para conversar</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <NotificationCenter userId={user.id} />
+              <Button
+                variant={chatMode === "ai" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setChatMode("ai")
+                  setSelectedPerson(null)
+                  setMessages([])
+                }}
+              >
+                <Bot className="w-4 h-4 mr-2" />
+                IA
+              </Button>
+              <Button
+                variant={chatMode === "person" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  if (people.length > 0) {
+                    setSelectedPerson(people[0])
+                    setChatMode("person")
+                    setMessages([])
+                  }
+                }}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Pessoas
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Chat Messages */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
+            {messages.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">
+                  {chatMode === "ai" ? `Converse com ${getAIName()}` : "Inicie uma conversa"}
+                </h3>
+                <p className="text-gray-600">
+                  {chatMode === "ai"
+                    ? "Sua assistente está pronta para ajudar com suas tarefas e produtividade"
+                    : selectedPerson
+                    ? `Comece a conversar com ${selectedPerson.name}`
+                    : "Selecione uma pessoa na lista à esquerda"}
+                </p>
+              </div>
+            ) : (
+              messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                      message.sender === "user"
+                        ? "bg-blue-600 text-white"
+                        : message.sender === "ai"
+                        ? "bg-purple-100 text-purple-900"
+                        : "bg-gray-100 text-gray-900"
+                    }`}
+                  >
+                    <p className="text-sm">{message.content}</p>
+                    <p
+                      className={`text-xs mt-1 ${
+                        message.sender === "user" ? "text-blue-100" : "text-gray-500"
+                      }`}
+                    >
+                      {message.timestamp}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+
+        {/* Chat Input */}
+        <div className="bg-white border-t border-gray-200 p-4">
+          <div className="flex items-center space-x-2">
+            <Input
+              placeholder={
+                chatMode === "ai"
+                  ? `Digite sua mensagem para ${getAIName()}...`
+                  : selectedPerson
+                  ? `Mensagem para ${selectedPerson.name}...`
+                  : "Selecione uma conversa..."
+              }
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+              disabled={chatMode === "person" && !selectedPerson}
+              className="flex-1"
+            />
+            <Button onClick={sendMessage} disabled={!newMessage.trim() || (chatMode === "person" && !selectedPerson)}>
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Coluna Central - Chat */}
-      <div className="flex-1 flex flex-col">
-        {chatMode === "ai" ? (
-          <div className="h-full">
-            <div className="bg-white border-b border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <Bot className="h-5 w-5 text-white" />
+      {/* Right Column - Tasks & Insights */}
+      <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="font-semibold text-gray-900">Painel de Controle</h2>
+        </div>
+
+        <ScrollArea className="flex-1 p-4 space-y-6">
+          {/* WhatsApp Connection */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <Smartphone className="w-4 h-4 mr-2 text-green-600" />
+                WhatsApp
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {whatsappError && (
+                <Alert className="border-red-200 bg-red-50">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-red-700 text-xs">{whatsappError}</AlertDescription>
+                </Alert>
+              )}
+
+              {!whatsappSession || whatsappSession.status === "EXPIRED" ? (
+                <div className="text-center">
+                  <Button onClick={connectWhatsApp} disabled={isConnectingWhatsApp} size="sm" className="w-full">
+                    {isConnectingWhatsApp ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
+                        Conectando...
+                      </>
+                    ) : (
+                      <>
+                        <QrCode className="w-3 h-3 mr-2" />
+                        Conectar
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div>
-                  <h3 className="font-medium">Assistente IA</h3>
-                  <p className="text-sm text-gray-600">
-                    {userRole === "simple" ? "Sofia - Sua assistente pessoal" : "Helena - Assistente de liderança"}
-                  </p>
+              ) : whatsappSession.status === "INITIALIZING" ? (
+                <div className="text-center py-2">
+                  <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-2 animate-spin" />
+                  <p className="text-xs text-gray-600">Inicializando...</p>
                 </div>
-                <div className="ml-auto">
-                  <Badge className="bg-green-100 text-green-800">Online</Badge>
-                </div>
-              </div>
-            </div>
-            <div className="flex-1">
-              <AIChat
-                userRole={userRole}
-                clientId="1"
-                hasInternetAccess={userRole === "leader"}
-                availableModels={
-                  userRole === "simple" ? ["gpt-3.5-turbo", "gpt-4"] : ["gpt-3.5-turbo", "gpt-4", "gemini-pro"]
-                }
-              />
-            </div>
-          </div>
-        ) : selectedConv ? (
-          <div className="h-full flex flex-col">
-            <div className="bg-white border-b border-gray-200 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <img
-                      src={selectedConv.avatar || "/placeholder.svg"}
-                      alt={selectedConv.name}
-                      className="w-10 h-10 rounded-full"
-                    />
-                    <div
-                      className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${getStatusColor(
-                        selectedConv.status,
-                      )}`}
-                    />
+              ) : whatsappSession.status === "SCAN_QR_CODE" ? (
+                <div className="text-center">
+                  <div className="bg-white p-2 rounded border-2 border-dashed border-gray-300 mb-2">
+                    {whatsappSession.qr ? (
+                      <div className="relative">
+                        <img
+                          src={whatsappSession.qr || "/placeholder.svg"}
+                          alt="QR Code WhatsApp"
+                          className="w-32 h-32 mx-auto"
+                          onError={(e) => {
+                            console.error("Erro ao carregar QR Code")
+                            setWhatsappError("Erro ao carregar QR Code. Tente novamente.")
+                          }}
+                        />
+                        {timeLeft > 0 && (
+                          <div className="absolute top-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 rounded">
+                            {formatTime(timeLeft)}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="w-32 h-32 bg-gray-100 flex items-center justify-center mx-auto">
+                        <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <h3 className="font-medium">{selectedConv.name}</h3>
-                    <p className="text-sm text-gray-600 capitalize">{selectedConv.status}</p>
+                  <p className="text-xs text-gray-600 mb-2">Escaneie com WhatsApp</p>
+                  <div className="flex space-x-1">
+                    <Button variant="outline" size="sm" onClick={refreshQRCode} className="flex-1">
+                      <RefreshCw className="w-3 h-3" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setWhatsappSession(null)} className="flex-1">
+                      Cancelar
+                    </Button>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    {getSentimentIcon(selectedConv.sentiment)}
-                    <Badge className={getPriorityColor(selectedConv.priority)} variant="outline">
-                      {selectedConv.priority}
+                </div>
+              ) : whatsappSession.status === "WORKING" ? (
+                <div className="space-y-2">
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700 text-xs">
+                      <strong>Conectado!</strong>
+                      {whatsappSession.me?.pushName && (
+                        <>
+                          <br />
+                          {whatsappSession.me.pushName}
+                        </>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                  <Button variant="outline" size="sm" onClick={disconnectWhatsApp} className="w-full">
+                    <WifiOff className="w-3 h-3 mr-2" />
+                    Desconectar
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <AlertCircle className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+                  <p className="text-xs text-gray-600 mb-2">Status: {whatsappSession.status}</p>
+                  <Button size="sm" onClick={refreshQRCode} className="w-full">
+                    Tentar Novamente
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Subtle AI Suggestions */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <Brain className="w-4 h-4 mr-2 text-purple-600" />
+                Insights Inteligentes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {getSubtleSuggestions().map((suggestion, index) => (
+                <div key={index} className="flex items-start space-x-2 p-2 bg-gray-50 rounded text-xs">
+                  <suggestion.icon className="w-3 h-3 mt-0.5 text-gray-600 flex-shrink-0" />
+                  <span className="text-gray-700">{suggestion.text}</span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Tasks */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center justify-between">
+                <span className="flex items-center">
+                  <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
+                  {user.role === "simple" ? "Suas Tarefas" : "Tarefas da Equipe"}
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  {tasks.filter((t) => t.status !== "completed").length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {tasks.slice(0, 4).map((task) => (
+                <div key={task.id} className="p-2 border border-gray-200 rounded text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-gray-900 truncate">{task.title}</span>
+                    {task.needsFollowUp && (
+                      <Badge variant="destructive" className="text-xs">
+                        Cobrar
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-gray-600">
+                    <span>
+                      {user.role === "simple" ? `Por: ${task.assignedBy}` : `Para: ${task.assignedTo}`}
+                    </span>
+                    <span>{task.dueDate}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <Badge
+                      variant={
+                        task.status === "completed"
+                          ? "default"
+                          : task.status === "in_progress"
+                          ? "secondary"
+                          : "outline"
+                      }
+                      className="text-xs"
+                    >
+                      {task.status === "completed"
+                        ? "Concluída"
+                        : task.status === "in_progress"
+                        ? "Em andamento"
+                        : "Pendente"}
+                    </Badge>
+                    <Badge
+                      variant={
+                        task.priority === "high" ? "destructive" : task.priority === "medium" ? "default" : "secondary"
+                      }
+                      className="text-xs"
+                    >
+                      {task.priority}
                     </Badge>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Phone className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <Video className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center">
+                <BarChart3 className="w-4 h-4 mr-2 text-green-600" />
+                Resumo Rápido
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-600">Conversas ativas</span>
+                <span className="font-medium">{people.filter((p) => p.status === "online").length}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-600">Tarefas pendentes</span>
+                <span className="font-medium">{tasks.filter((t) => t.status === "pending").length}</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-gray-600">Sentimento geral</span>
+                <span className="font-medium text-green-600">Positivo</span>
+              </div>
+              {user.role !== "simple" && (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-gray-600">Precisam follow-up</span>
+                  <span className="font-medium text-red-600">
+                    {tasks.filter((t) => t.needsFollowUp).length}
+                  </span>
                 </div>
-              </div>
-            </div>
-
-            <div className="flex-1 bg-gray-50 p-4">
-              <div className="space-y-4">
-                <div className="flex justify-start">
-                  <div className="bg-white p-3 rounded-lg max-w-xs shadow-sm">
-                    <p className="text-sm">{selectedConv.lastMessage}</p>
-                    <span className="text-xs text-gray-500 mt-1 block">{selectedConv.timestamp}</span>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <div className="bg-blue-600 text-white p-3 rounded-lg max-w-xs">
-                    <p className="text-sm">Entendi, vou providenciar o mais rápido possível.</p>
-                    <span className="text-xs opacity-75 mt-1 block">14:32</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border-t border-gray-200 p-4">
-              <div className="flex space-x-2">
-                <Input placeholder="Digite sua mensagem..." className="flex-1" />
-                <Button>
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Selecione uma conversa</h3>
-              <p className="text-gray-600">Escolha uma conversa à esquerda ou use o chat com IA</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Coluna Direita - Tarefas e Sugestões */}
-      <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold">Tarefas & Sugestões</h2>
-        </div>
-
-        <ScrollArea className="flex-1">
-          <div className="p-4 space-y-6">
-            {/* Tarefas */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-sm">Suas Tarefas</h3>
-                <Badge variant="secondary">{tasks.filter((t) => t.status !== "completed").length} pendentes</Badge>
-              </div>
-              <div className="space-y-3">
-                {tasks.slice(0, 3).map((task) => (
-                  <div
-                    key={task.id}
-                    className={`p-3 border rounded-lg text-sm ${
-                      task.status === "completed" ? "opacity-60 bg-gray-50" : "bg-white"
-                    }`}
-                  >
-                    <div className="flex items-start space-x-2">
-                      <Checkbox
-                        checked={task.status === "completed"}
-                        onCheckedChange={() => handleTaskToggle(task.id)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-1">
-                          <h4
-                            className={`font-medium text-xs ${
-                              task.status === "completed" ? "line-through text-gray-500" : "text-gray-900"
-                            }`}
-                          >
-                            {task.title}
-                          </h4>
-                          <Badge className={getPriorityColor(task.priority)} variant="outline">
-                            {task.priority}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-gray-600 mb-2">{task.description}</p>
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>{task.assignedBy}</span>
-                          <div className="flex items-center space-x-1">
-                            <Clock className="h-3 w-3" />
-                            <span>{new Date(task.dueDate).toLocaleDateString("pt-BR")}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Sugestões da IA */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-sm">Sugestões da IA</h3>
-                <Badge className="bg-blue-100 text-blue-800">Ativo</Badge>
-              </div>
-              <div className="space-y-3">
-                {aiSuggestions.slice(0, 3).map((suggestion) => (
-                  <div key={suggestion.id} className="p-3 border rounded-lg bg-gradient-to-r from-blue-50 to-purple-50">
-                    <div className="flex items-start space-x-2">
-                      <suggestion.icon className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-xs text-blue-900 mb-1">{suggestion.title}</h4>
-                        <p className="text-xs text-blue-700 mb-2">{suggestion.content}</p>
-                        {suggestion.targetPerson && (
-                          <div className="flex items-center space-x-1 mb-2">
-                            <User className="h-3 w-3 text-blue-600" />
-                            <span className="text-xs text-blue-600 font-medium">{suggestion.targetPerson}</span>
-                          </div>
-                        )}
-                        <div className="flex space-x-1">
-                          <Button size="sm" variant="outline" className="text-xs h-6 px-2 bg-white border-blue-300">
-                            Aplicar
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-xs h-6 px-2 text-blue-600">
-                            Próxima
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Conexão WhatsApp */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-medium text-sm">WhatsApp</h3>
-                <Badge className={whatsappConnected ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                  {whatsappConnected ? "Conectado" : "Desconectado"}
-                </Badge>
-              </div>
-              <div className="space-y-3">
-                <WhatsAppConnection userRole={userRole} clientId="1" onConnectionChange={setWhatsappConnected} />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Insights Rápidos */}
-            <div>
-              <h3 className="font-medium text-sm mb-3">Insights Rápidos</h3>
-              <div className="space-y-2">
-                <div className="p-2 bg-green-50 border border-green-200 rounded text-xs">
-                  <div className="flex items-center space-x-1">
-                    <TrendingUp className="h-3 w-3 text-green-600" />
-                    <span className="font-medium text-green-800">Produtividade +15%</span>
-                  </div>
-                  <p className="text-green-700 mt-1">Você está 15% mais produtivo esta semana!</p>
-                </div>
-                <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                  <div className="flex items-center space-x-1">
-                    <AlertTriangle className="h-3 w-3 text-yellow-600" />
-                    <span className="font-medium text-yellow-800">Atenção</span>
-                  </div>
-                  <p className="text-yellow-700 mt-1">João Santos precisa de suporte no projeto</p>
-                </div>
-                <div className="p-2 bg-blue-50 border border-blue-200 rounded text-xs">
-                  <div className="flex items-center space-x-1">
-                    <Star className="h-3 w-3 text-blue-600" />
-                    <span className="font-medium text-blue-800">Destaque</span>
-                  </div>
-                  <p className="text-blue-700 mt-1">Ana Silva está com excelente engajamento</p>
-                </div>
-              </div>
-            </div>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </ScrollArea>
       </div>
     </div>

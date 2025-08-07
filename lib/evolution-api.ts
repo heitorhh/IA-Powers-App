@@ -226,3 +226,43 @@ export const evolutionAPI = new EvolutionAPI({
   baseUrl: process.env.EVOLUTION_API_URL || 'https://evolution-api-production.up.railway.app',
   apiKey: process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976'
 })
+
+// Manager global para controle de instâncias
+class EvolutionManager {
+  private instances: Map<string, EvolutionAPI> = new Map()
+
+  createManager(config: EvolutionConfig): EvolutionAPI {
+    const key = `${config.baseUrl}-${config.apiKey}`
+    
+    if (!this.instances.has(key)) {
+      this.instances.set(key, new EvolutionAPI(config))
+    }
+    
+    return this.instances.get(key)!
+  }
+
+  getManager(baseUrl: string, apiKey: string): EvolutionAPI | undefined {
+    const key = `${baseUrl}-${apiKey}`
+    return this.instances.get(key)
+  }
+
+  getAllManagers(): EvolutionAPI[] {
+    return Array.from(this.instances.values())
+  }
+
+  removeManager(baseUrl: string, apiKey: string): boolean {
+    const key = `${baseUrl}-${apiKey}`
+    return this.instances.delete(key)
+  }
+}
+
+const globalEvolutionManager = new EvolutionManager()
+
+// Exportação da função que estava faltando
+export function getEvolutionManager(): EvolutionManager {
+  return globalEvolutionManager
+}
+
+// Exportações adicionais
+export type { EvolutionConfig, InstanceInfo, MessageData }
+export { EvolutionManager }
