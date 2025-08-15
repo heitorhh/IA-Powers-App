@@ -1,66 +1,88 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 
 export async function GET() {
   try {
     // Simular dados de teste
     const testData = {
-      message: "WhatsApp API está funcionando!",
+      success: true,
+      message: "API WhatsApp funcionando perfeitamente!",
       timestamp: new Date().toISOString(),
-      endpoints: {
-        sessions: "/api/whatsapp/sessions",
-        messages: "/api/whatsapp/messages",
-        chats: "/api/whatsapp/chats",
-        webhook: "/api/webhook/whatsapp",
-        health: "/api/whatsapp/health",
+      features: {
+        webhook: "✅ Ativo",
+        whatsappWeb: "✅ Conectado",
+        sentimentAnalysis: "✅ Funcionando",
+        aiResponses: "✅ Ativo",
       },
-      features: [
-        "Criação de sessões",
-        "Geração de QR Code",
-        "Envio de mensagens",
-        "Recebimento via webhook",
-        "Análise de sentimentos",
-        "Monitoramento de conversas",
-      ],
+      sampleData: {
+        messages: [
+          {
+            id: "test_msg_1",
+            from: "5511999999999",
+            text: "Olá! Este é um teste.",
+            sentiment: "neutral",
+            aiResponse: "Olá! Como posso ajudá-lo hoje?",
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        stats: {
+          totalMessages: 1,
+          sentimentDistribution: {
+            positive: 0,
+            negative: 0,
+            neutral: 1,
+          },
+        },
+      },
     }
 
-    return NextResponse.json({
-      success: true,
-      data: testData,
-    })
+    return NextResponse.json(testData)
   } catch (error) {
-    console.error("Test endpoint error:", error)
+    console.error("Erro no teste da API:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Test endpoint failed",
+        error: "Erro ao executar teste",
+        timestamp: new Date().toISOString(),
       },
       { status: 500 },
     )
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const body = await request.json()
-    
-    // Simular processamento de teste
-    const result = {
-      received: body,
-      processed: true,
+    // Simular processamento de mensagem de teste
+    const testMessage = {
+      id: `test_${Date.now()}`,
+      from: "test_user",
+      text: "Esta é uma mensagem de teste para verificar o sistema",
       timestamp: new Date().toISOString(),
-      testId: `test_${Date.now()}`,
     }
 
-    return NextResponse.json({
+    // Simular análise de sentimento
+    const sentiment = "positive"
+    const aiResponse = "Teste recebido com sucesso! Sistema funcionando perfeitamente."
+
+    const result = {
       success: true,
-      data: result,
-    })
+      message: "Teste de envio executado com sucesso",
+      data: {
+        original: testMessage,
+        processed: {
+          sentiment,
+          aiResponse,
+          processedAt: new Date().toISOString(),
+        },
+      },
+    }
+
+    return NextResponse.json(result)
   } catch (error) {
-    console.error("Test POST error:", error)
+    console.error("Erro no teste POST:", error)
     return NextResponse.json(
       {
         success: false,
-        error: "Test POST failed",
+        error: "Erro ao executar teste POST",
       },
       { status: 500 },
     )

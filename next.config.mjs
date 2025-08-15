@@ -1,26 +1,37 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['whatsapp-web.js', 'qrcode-terminal', 'puppeteer']
-  },
-  webpack: (config, { isServer }) => {
-    if (isServer) {
-      config.externals.push('whatsapp-web.js')
-    }
-    return config
-  },
-  env: {
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true',
-    PUPPETEER_EXECUTABLE_PATH: '/usr/bin/google-chrome-stable'
-  },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
+  experimental: {
+    serverComponentsExternalPackages: []
+  },
   images: {
+    domains: ['api.qrserver.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'api.qrserver.com',
+        port: '',
+        pathname: '/v1/create-qr-code/**',
+      },
+    ],
     unoptimized: true,
+  },
+  async headers() {
+    return [
+      {
+        source: '/api/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
+        ],
+      },
+    ]
   },
 }
 

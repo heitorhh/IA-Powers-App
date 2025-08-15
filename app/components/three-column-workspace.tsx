@@ -1,856 +1,471 @@
-"use client"
+'use client'
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { MessageSquare, Send, Search, Users, CheckCircle, Clock, AlertTriangle, TrendingUp, Brain, Smartphone, QrCode, RefreshCw, CheckCircle2, AlertCircle, WifiOff, Wifi, User, Bot, ArrowRight, Target, Lightbulb, Calendar, BarChart3 } from 'lucide-react'
-import NotificationCenter from './notification-center'
-
-interface User {
-  id: string
-  name: string
-  role: "simple" | "leader" | "master"
-  clientId: string
-}
-
-interface Person {
-  id: string
-  name: string
-  avatar: string
-  status: "online" | "offline" | "away"
-  lastMessage: string
-  timestamp: string
-  sentiment: "positive" | "negative" | "neutral"
-  priority: "high" | "medium" | "low"
-  unreadCount: number
-}
+import { useState, useEffect } from 'react'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
+import { useNotifications } from '@/hooks/use-notifications'
+import { MessageSquare, CheckCircle2, Clock, TrendingUp, Users, Brain, Zap, Target, BarChart3, Bell, Settings, Plus, Filter, Search } from 'lucide-react'
 
 interface Task {
   id: string
   title: string
-  assignedBy?: string
-  assignedTo?: string
-  status: "pending" | "in_progress" | "completed"
-  priority: "high" | "medium" | "low"
-  dueDate: string
-  needsFollowUp?: boolean
+  description: string
+  priority: 'low' | 'medium' | 'high'
+  status: 'pending' | 'in-progress' | 'completed'
+  dueDate: Date
+  category: string
 }
 
-interface Message {
+interface Conversation {
   id: string
-  content: string
-  sender: "user" | "ai" | string
-  timestamp: string
-  type: "text"
+  contact: string
+  lastMessage: string
+  timestamp: Date
+  unread: number
+  sentiment: 'positive' | 'neutral' | 'negative'
+  platform: 'whatsapp' | 'email' | 'chat'
 }
 
-interface WhatsAppSession {
+interface AISuggestion {
   id: string
-  name: string
-  status: "INITIALIZING" | "SCAN_QR_CODE" | "WORKING" | "EXPIRED" | "DISCONNECTED"
-  qr?: string
-  expiresAt?: string
-  me?: {
-    id: string
-    pushName: string
-    name: string
-    phone: string
-  }
+  type: 'task' | 'response' | 'optimization' | 'insight'
+  title: string
+  description: string
+  confidence: number
+  action?: () => void
 }
 
-interface ThreeColumnWorkspaceProps {
-  user: User
-}
+export function ThreeColumnWorkspace() {
+  const { addNotification, unreadCount } = useNotifications()
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([])
+  const [selectedTab, setSelectedTab] = useState('overview')
 
-export default function ThreeColumnWorkspace({ user }: ThreeColumnWorkspaceProps) {
-  // Add safety check for user
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
-  }
-
-  const [selectedPerson, setSelectedPerson] = useState<Person | null>(null)
-  const [chatMode, setChatMode] = useState<"ai" | "person">("ai")
-  const [messages, setMessages] = useState<Message[]>([])
-  const [newMessage, setNewMessage] = useState("")
-  const [searchTerm, setSearchTerm] = useState("")
-  const [whatsappSession, setWhatsappSession] = useState<WhatsAppSession | null>(null)
-  const [isConnectingWhatsApp, setIsConnectingWhatsApp] = useState(false)
-  const [whatsappError, setWhatsappError] = useState<string | null>(null)
-  const [timeLeft, setTimeLeft] = useState<number>(0)
-
-  // Mock data
-  const [people] = useState<Person[]>([
-    {
-      id: "1",
-      name: "Carlos Mendes",
-      avatar: "/placeholder.svg?height=40&width=40&text=CM",
-      status: "online",
-      lastMessage: "Preciso urgente do relatório financeiro...",
-      timestamp: "2 min",
-      sentiment: "negative",
-      priority: "high",
-      unreadCount: 3,
-    },
-    {
-      id: "2",
-      name: "Ana Silva",
-      avatar: "/placeholder.svg?height=40&width=40&text=AS",
-      status: "online",
-      lastMessage: "Ótima apresentação hoje! Parabéns 👏",
-      timestamp: "15 min",
-      sentiment: "positive",
-      priority: "medium",
-      unreadCount: 0,
-    },
-    {
-      id: "3",
-      name: "João Santos",
-      avatar: "/placeholder.svg?height=40&width=40&text=JS",
-      status: "away",
-      lastMessage: "Estou muito estressado com essas demandas...",
-      timestamp: "1h",
-      sentiment: "negative",
-      priority: "high",
-      unreadCount: 1,
-    },
-    {
-      id: "4",
-      name: "Maria Costa",
-      avatar: "/placeholder.svg?height=40&width=40&text=MC",
-      status: "offline",
-      lastMessage: "Vou entregar o projeto amanhã cedo",
-      timestamp: "3h",
-      sentiment: "neutral",
-      priority: "medium",
-      unreadCount: 0,
-    },
-  ])
-
-  const [tasks] = useState<Task[]>([
-    {
-      id: "1",
-      title: "Revisar relatório mensal",
-      assignedBy: user.role === "simple" ? "Ana Silva" : undefined,
-      assignedTo: user.role !== "simple" ? "Carlos Mendes" : undefined,
-      status: "pending",
-      priority: "high",
-      dueDate: "Hoje",
-      needsFollowUp: user.role !== "simple",
-    },
-    {
-      id: "2",
-      title: "Preparar apresentação Q4",
-      assignedBy: user.role === "simple" ? "João Santos" : undefined,
-      assignedTo: user.role !== "simple" ? "Maria Costa" : undefined,
-      status: "in_progress",
-      priority: "medium",
-      dueDate: "Amanhã",
-    },
-    {
-      id: "3",
-      title: "Análise de performance da equipe",
-      assignedBy: user.role === "simple" ? "Diretor" : undefined,
-      assignedTo: user.role !== "simple" ? "João Santos" : undefined,
-      status: "completed",
-      priority: "low",
-      dueDate: "Ontem",
-    },
-  ])
-
-  // WhatsApp Timer
+  // Initialize demo data
   useEffect(() => {
-    if (whatsappSession && whatsappSession.status === "SCAN_QR_CODE" && whatsappSession.expiresAt) {
-      const updateTimer = () => {
-        const now = new Date().getTime()
-        const expires = new Date(whatsappSession.expiresAt!).getTime()
-        const remaining = Math.max(0, expires - now)
-        setTimeLeft(Math.floor(remaining / 1000))
-
-        if (remaining <= 0) {
-          setWhatsappSession({ ...whatsappSession, status: "EXPIRED" })
-        }
+    // Demo tasks
+    setTasks([
+      {
+        id: '1',
+        title: 'Responder proposta comercial',
+        description: 'Analisar e responder proposta do cliente ABC',
+        priority: 'high',
+        status: 'pending',
+        dueDate: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
+        category: 'Vendas'
+      },
+      {
+        id: '2',
+        title: 'Reunião de planejamento',
+        description: 'Preparar apresentação para reunião semanal',
+        priority: 'medium',
+        status: 'in-progress',
+        dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // 1 day from now
+        category: 'Gestão'
+      },
+      {
+        id: '3',
+        title: 'Atualizar relatório mensal',
+        description: 'Compilar dados de performance do mês',
+        priority: 'low',
+        status: 'pending',
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 1 week from now
+        category: 'Relatórios'
       }
+    ])
 
-      updateTimer()
-      const interval = setInterval(updateTimer, 1000)
-      return () => clearInterval(interval)
-    }
-  }, [whatsappSession])
-
-  // WhatsApp Status Polling
-  useEffect(() => {
-    if (whatsappSession && (whatsappSession.status === "SCAN_QR_CODE" || whatsappSession.status === "INITIALIZING")) {
-      const interval = setInterval(() => {
-        checkWhatsAppStatus()
-      }, 3000)
-
-      return () => clearInterval(interval)
-    }
-  }, [whatsappSession])
-
-  const checkWhatsAppStatus = async () => {
-    if (!whatsappSession) return
-
-    try {
-      const response = await fetch(`/api/whatsapp/sessions/${whatsappSession.name}`)
-      const data = await response.json()
-
-      if (data.success) {
-        setWhatsappSession(data.session)
-        if (data.session.status === "WORKING") {
-          setWhatsappError(null)
-        }
+    // Demo conversations
+    setConversations([
+      {
+        id: '1',
+        contact: 'João Silva',
+        lastMessage: 'Quando podemos agendar a reunião?',
+        timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+        unread: 2,
+        sentiment: 'positive',
+        platform: 'whatsapp'
+      },
+      {
+        id: '2',
+        contact: 'Maria Santos',
+        lastMessage: 'Preciso de mais informações sobre o produto',
+        timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+        unread: 1,
+        sentiment: 'neutral',
+        platform: 'email'
+      },
+      {
+        id: '3',
+        contact: 'Pedro Costa',
+        lastMessage: 'Obrigado pelo excelente atendimento!',
+        timestamp: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
+        unread: 0,
+        sentiment: 'positive',
+        platform: 'chat'
       }
-    } catch (error) {
-      console.error("Erro ao verificar status:", error)
-    }
-  }
+    ])
 
-  const connectWhatsApp = async () => {
-    if (!user) return
+    // Demo AI suggestions
+    setAiSuggestions([
+      {
+        id: '1',
+        type: 'task',
+        title: 'Priorizar tarefa urgente',
+        description: 'A proposta comercial tem prazo apertado e alta importância',
+        confidence: 95
+      },
+      {
+        id: '2',
+        type: 'response',
+        title: 'Resposta sugerida para João',
+        description: 'Baseado no histórico, sugiro agendar para amanhã às 14h',
+        confidence: 87
+      },
+      {
+        id: '3',
+        type: 'insight',
+        title: 'Padrão identificado',
+        description: 'Clientes respondem 40% mais rápido às mensagens matinais',
+        confidence: 78
+      }
+    ])
+  }, [])
+
+  const handleTaskComplete = (taskId: string) => {
+    setTasks(prev => prev.map(task => 
+      task.id === taskId 
+        ? { ...task, status: 'completed' as const }
+        : task
+    ))
     
-    setIsConnectingWhatsApp(true)
-    setWhatsappError(null)
-
-    try {
-      const response = await fetch("/api/whatsapp/sessions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: `whatsapp_${user.role}_${Date.now()}`,
-          clientId: user.clientId || `client_${user.id}`,
-          userRole: user.role,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setWhatsappSession(data.session)
-        setWhatsappError(null)
-      } else {
-        setWhatsappError(data.error || "Erro ao gerar QR Code")
-      }
-    } catch (error) {
-      setWhatsappError("Erro de conexão com o servidor")
-      console.error("Erro:", error)
-    } finally {
-      setIsConnectingWhatsApp(false)
-    }
+    addNotification({
+      title: 'Tarefa Concluída',
+      message: 'Parabéns! Você completou uma tarefa.',
+      type: 'tasks',
+      priority: 'medium'
+    })
   }
 
-  const disconnectWhatsApp = async () => {
-    if (!whatsappSession) return
-
-    try {
-      const response = await fetch(`/api/whatsapp/sessions/${whatsappSession.name}`, {
-        method: "DELETE",
-      })
-
-      if (response.ok) {
-        setWhatsappSession(null)
-        setWhatsappError(null)
-      }
-    } catch (error) {
-      console.error("Erro ao desconectar:", error)
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'destructive'
+      case 'medium': return 'default'
+      case 'low': return 'secondary'
+      default: return 'default'
     }
-  }
-
-  const refreshQRCode = () => {
-    if (whatsappSession) {
-      setWhatsappSession(null)
-    }
-    connectWhatsApp()
-  }
-
-  const getAIName = () => {
-    if (!user) return "Assistente"
-    switch (user.role) {
-      case "simple":
-        return "Sofia"
-      case "leader":
-        return "Helena"
-      case "master":
-        return "Alexandra"
-      default:
-        return "Assistente"
-    }
-  }
-
-  const getAIPersonality = () => {
-    if (!user) return "Assistente inteligente"
-    switch (user.role) {
-      case "simple":
-        return "Sua assistente pessoal focada em produtividade"
-      case "leader":
-        return "Especialista em gestão de equipes e liderança"
-      case "master":
-        return "Consultora estratégica para alta gestão"
-      default:
-        return "Assistente inteligente"
-    }
-  }
-
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return
-
-    const message: Message = {
-      id: Date.now().toString(),
-      content: newMessage,
-      sender: "user",
-      timestamp: new Date().toLocaleTimeString(),
-      type: "text",
-    }
-
-    setMessages((prev) => [...prev, message])
-    setNewMessage("")
-
-    // Simulate AI response
-    if (chatMode === "ai") {
-      setTimeout(() => {
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          content: getAIResponse(newMessage),
-          sender: "ai",
-          timestamp: new Date().toLocaleTimeString(),
-          type: "text",
-        }
-        setMessages((prev) => [...prev, aiResponse])
-      }, 1000)
-    }
-  }
-
-  const getAIResponse = (userMessage: string): string => {
-    if (!user) return "Desculpe, não consegui processar sua mensagem."
-  
-    const responses = {
-      simple: [
-        "Entendi! Vou te ajudar a organizar isso melhor. Que tal criarmos uma lista de prioridades?",
-        "Ótima pergunta! Baseado no seu perfil, sugiro focar primeiro nas tarefas mais urgentes.",
-        "Posso ver que você está se esforçando muito. Vamos encontrar uma forma mais eficiente de fazer isso.",
-      ],
-      leader: [
-        "Como líder, é importante você delegar essa tarefa. Que tal conversar com o Carlos sobre isso?",
-        "Vejo que sua equipe está com algumas demandas em atraso. Sugiro uma reunião de alinhamento.",
-        "Excelente insight! Isso pode impactar positivamente toda a equipe. Como planeja implementar?",
-      ],
-      master: [
-        "Essa decisão pode ter impacto estratégico. Vamos analisar os dados antes de prosseguir.",
-        "Considerando o cenário atual, sugiro uma abordagem mais conservadora neste trimestre.",
-        "Perfeito! Essa iniciativa está alinhada com nossos objetivos de longo prazo.",
-      ],
-    }
-
-    const roleResponses = responses[user.role] || responses.simple
-    return roleResponses[Math.floor(Math.random() * roleResponses.length)]
   }
 
   const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
-      case "positive":
-        return "text-green-600"
-      case "negative":
-        return "text-red-600"
-      default:
-        return "text-yellow-600"
+      case 'positive': return 'text-green-600'
+      case 'negative': return 'text-red-600'
+      case 'neutral': return 'text-gray-600'
+      default: return 'text-gray-600'
     }
   }
 
-  const getSentimentBadge = (sentiment: string) => {
-    switch (sentiment) {
-      case "positive":
-        return <Badge className="bg-green-100 text-green-800 text-xs">😊</Badge>
-      case "negative":
-        return <Badge className="bg-red-100 text-red-800 text-xs">😟</Badge>
-      default:
-        return <Badge className="bg-yellow-100 text-yellow-800 text-xs">😐</Badge>
-    }
-  }
-
-  const getSubtleSuggestions = () => {
-    if (!user) return []
-    switch (user.role) {
-      case "simple":
-        return [
-          { icon: Target, text: "Foque na tarefa do Carlos primeiro", type: "priority" },
-          { icon: Clock, text: "15min de pausa pode aumentar sua produtividade", type: "wellness" },
-          { icon: Lightbulb, text: "Que tal organizar suas tarefas por energia necessária?", type: "tip" },
-        ]
-      case "leader":
-        return [
-          { icon: Users, text: "João precisa de apoio - sentimento negativo detectado", type: "team" },
-          { icon: TrendingUp, text: "Ana está motivada - bom momento para novos desafios", type: "opportunity" },
-          { icon: AlertTriangle, text: "3 tarefas delegadas precisam de follow-up", type: "action" },
-        ]
-      case "master":
-        return [
-          { icon: BarChart3, text: "Produtividade da equipe subiu 12% esta semana", type: "insight" },
-          { icon: Brain, text: "Padrão identificado: reuniões 2ª feira são 30% menos produtivas", type: "pattern" },
-          { icon: Calendar, text: "Momento ideal para implementar mudanças estratégicas", type: "timing" },
-        ]
-      default:
-        return []
-    }
-  }
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
-  const filteredPeople = people.filter((person) => person.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const completedTasks = tasks.filter(t => t.status === 'completed').length
+  const totalTasks = tasks.length
+  const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Left Column - People List */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="Buscar conversas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+      {/* Left Column - Tasks & Productivity */}
+      <div className="w-1/3 border-r bg-white p-4 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Target className="h-5 w-5" />
+            Produtividade
+          </h2>
+          <Button size="sm" variant="outline">
+            <Plus className="h-4 w-4 mr-1" />
+            Nova Tarefa
+          </Button>
+        </div>
+
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="h-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="tasks">Tarefas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Progresso Diário</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Tarefas Concluídas</span>
+                    <span>{completedTasks}/{totalTasks}</span>
+                  </div>
+                  <Progress value={completionRate} className="h-2" />
+                  <p className="text-xs text-gray-600">
+                    {completionRate.toFixed(0)}% do objetivo diário
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Estatísticas</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    <span className="text-sm">Concluídas hoje</span>
+                  </div>
+                  <span className="font-semibold">{completedTasks}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm">Pendentes</span>
+                  </div>
+                  <span className="font-semibold">
+                    {tasks.filter(t => t.status === 'pending').length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm">Em progresso</span>
+                  </div>
+                  <span className="font-semibold">
+                    {tasks.filter(t => t.status === 'in-progress').length}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tasks" className="mt-4">
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              <div className="space-y-3">
+                {tasks.map((task) => (
+                  <Card key={task.id} className="p-3">
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between">
+                        <h4 className="font-medium text-sm">{task.title}</h4>
+                        <Badge variant={getPriorityColor(task.priority)} className="text-xs">
+                          {task.priority}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-600">{task.description}</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">
+                          {task.dueDate.toLocaleDateString()}
+                        </span>
+                        {task.status !== 'completed' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleTaskComplete(task.id)}
+                          >
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Concluir
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Middle Column - Conversations */}
+      <div className="w-1/3 border-r bg-white p-4 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Conversas
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="ml-2">
+                {unreadCount}
+              </Badge>
+            )}
+          </h2>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline">
+              <Search className="h-4 w-4" />
+            </Button>
+            <Button size="sm" variant="outline">
+              <Filter className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-2">
-            {filteredPeople.map((person) => (
-              <div
-                key={person.id}
-                onClick={() => {
-                  setSelectedPerson(person)
-                  setChatMode("person")
-                  setMessages([])
-                }}
-                className={`flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                  selectedPerson?.id === person.id && chatMode === "person"
-                    ? "bg-blue-50 border border-blue-200"
-                    : "hover:bg-gray-50"
-                }`}
-              >
-                <div className="relative">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={person.avatar || "/placeholder.svg"} alt={person.name} />
-                    <AvatarFallback>{person.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
-                  </Avatar>
-                  <div
-                    className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${
-                      person.status === "online"
-                        ? "bg-green-500"
-                        : person.status === "away"
-                        ? "bg-yellow-500"
-                        : "bg-gray-400"
-                    }`}
-                  />
-                </div>
-
-                <div className="flex-1 min-w-0">
+        <ScrollArea className="h-[calc(100vh-120px)]">
+          <div className="space-y-3">
+            {conversations.map((conversation) => (
+              <Card key={conversation.id} className="p-3 hover:bg-gray-50 cursor-pointer">
+                <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-gray-900 truncate">{person.name}</h3>
-                    <div className="flex items-center space-x-1">
-                      {getSentimentBadge(person.sentiment)}
-                      <span className="text-xs text-gray-500">{person.timestamp}</span>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-medium text-sm">{conversation.contact}</h4>
+                      <Badge variant="outline" className="text-xs">
+                        {conversation.platform}
+                      </Badge>
                     </div>
-                  </div>
-                  <p className="text-sm text-gray-600 truncate">{person.lastMessage}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <Badge
-                      variant={person.priority === "high" ? "destructive" : person.priority === "medium" ? "default" : "secondary"}
-                      className="text-xs"
-                    >
-                      {person.priority}
-                    </Badge>
-                    {person.unreadCount > 0 && (
-                      <Badge className="bg-blue-600 text-white text-xs">{person.unreadCount}</Badge>
+                    {conversation.unread > 0 && (
+                      <Badge variant="destructive" className="text-xs">
+                        {conversation.unread}
+                      </Badge>
                     )}
                   </div>
+                  <p className="text-xs text-gray-600 line-clamp-2">
+                    {conversation.lastMessage}
+                  </p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-500">
+                      {conversation.timestamp.toLocaleTimeString()}
+                    </span>
+                    <div className={`text-xs ${getSentimentColor(conversation.sentiment)}`}>
+                      {conversation.sentiment}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </ScrollArea>
       </div>
 
-      {/* Center Column - Chat */}
-      <div className="flex-1 flex flex-col">
-        {/* Chat Header */}
-        <div className="bg-white border-b border-gray-200 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {chatMode === "ai" ? (
-                <>
-                  <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                    <Bot className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h2 className="font-semibold text-gray-900">{getAIName()}</h2>
-                    <p className="text-sm text-gray-600">{getAIPersonality()}</p>
-                  </div>
-                </>
-              ) : selectedPerson ? (
-                <>
-                  <Avatar className="w-10 h-10">
-                    <AvatarImage src={selectedPerson.avatar || "/placeholder.svg"} alt={selectedPerson.name} />
-                    <AvatarFallback>{selectedPerson.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h2 className="font-semibold text-gray-900">{selectedPerson.name}</h2>
-                    <p className="text-sm text-gray-600 capitalize">{selectedPerson.status}</p>
-                  </div>
-                </>
-              ) : (
-                <div>
-                  <h2 className="font-semibold text-gray-900">Selecione uma conversa</h2>
-                  <p className="text-sm text-gray-600">Escolha alguém para conversar</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <NotificationCenter userId={user.id} />
-              <Button
-                variant={chatMode === "ai" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  setChatMode("ai")
-                  setSelectedPerson(null)
-                  setMessages([])
-                }}
-              >
-                <Bot className="w-4 h-4 mr-2" />
-                IA
-              </Button>
-              <Button
-                variant={chatMode === "person" ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  if (people.length > 0) {
-                    setSelectedPerson(people[0])
-                    setChatMode("person")
-                    setMessages([])
-                  }
-                }}
-              >
-                <User className="w-4 h-4 mr-2" />
-                Pessoas
-              </Button>
-            </div>
-          </div>
+      {/* Right Column - AI Insights & Analytics */}
+      <div className="w-1/3 bg-white p-4 overflow-hidden">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            IA Insights
+          </h2>
+          <Button size="sm" variant="outline">
+            <Settings className="h-4 w-4" />
+          </Button>
         </div>
 
-        {/* Chat Messages */}
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {chatMode === "ai" ? `Converse com ${getAIName()}` : "Inicie uma conversa"}
-                </h3>
-                <p className="text-gray-600">
-                  {chatMode === "ai"
-                    ? "Sua assistente está pronta para ajudar com suas tarefas e produtividade"
-                    : selectedPerson
-                    ? `Comece a conversar com ${selectedPerson.name}`
-                    : "Selecione uma pessoa na lista à esquerda"}
-                </p>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.sender === "user"
-                        ? "bg-blue-600 text-white"
-                        : message.sender === "ai"
-                        ? "bg-purple-100 text-purple-900"
-                        : "bg-gray-100 text-gray-900"
-                    }`}
-                  >
-                    <p className="text-sm">{message.content}</p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        message.sender === "user" ? "text-blue-100" : "text-gray-500"
-                      }`}
-                    >
-                      {message.timestamp}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
+        <Tabs defaultValue="suggestions" className="h-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="suggestions">Sugestões</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
 
-        {/* Chat Input */}
-        <div className="bg-white border-t border-gray-200 p-4">
-          <div className="flex items-center space-x-2">
-            <Input
-              placeholder={
-                chatMode === "ai"
-                  ? `Digite sua mensagem para ${getAIName()}...`
-                  : selectedPerson
-                  ? `Mensagem para ${selectedPerson.name}...`
-                  : "Selecione uma conversa..."
-              }
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && sendMessage()}
-              disabled={chatMode === "person" && !selectedPerson}
-              className="flex-1"
-            />
-            <Button onClick={sendMessage} disabled={!newMessage.trim() || (chatMode === "person" && !selectedPerson)}>
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Right Column - Tasks & Insights */}
-      <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-900">Painel de Controle</h2>
-        </div>
-
-        <ScrollArea className="flex-1 p-4 space-y-6">
-          {/* WhatsApp Connection */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center">
-                <Smartphone className="w-4 h-4 mr-2 text-green-600" />
-                WhatsApp
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {whatsappError && (
-                <Alert className="border-red-200 bg-red-50">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-700 text-xs">{whatsappError}</AlertDescription>
-                </Alert>
-              )}
-
-              {!whatsappSession || whatsappSession.status === "EXPIRED" ? (
-                <div className="text-center">
-                  <Button onClick={connectWhatsApp} disabled={isConnectingWhatsApp} size="sm" className="w-full">
-                    {isConnectingWhatsApp ? (
-                      <>
-                        <RefreshCw className="w-3 h-3 mr-2 animate-spin" />
-                        Conectando...
-                      </>
-                    ) : (
-                      <>
-                        <QrCode className="w-3 h-3 mr-2" />
-                        Conectar
-                      </>
-                    )}
-                  </Button>
-                </div>
-              ) : whatsappSession.status === "INITIALIZING" ? (
-                <div className="text-center py-2">
-                  <RefreshCw className="w-6 h-6 text-blue-500 mx-auto mb-2 animate-spin" />
-                  <p className="text-xs text-gray-600">Inicializando...</p>
-                </div>
-              ) : whatsappSession.status === "SCAN_QR_CODE" ? (
-                <div className="text-center">
-                  <div className="bg-white p-2 rounded border-2 border-dashed border-gray-300 mb-2">
-                    {whatsappSession.qr ? (
-                      <div className="relative">
-                        <img
-                          src={whatsappSession.qr || "/placeholder.svg"}
-                          alt="QR Code WhatsApp"
-                          className="w-32 h-32 mx-auto"
-                          onError={(e) => {
-                            console.error("Erro ao carregar QR Code")
-                            setWhatsappError("Erro ao carregar QR Code. Tente novamente.")
-                          }}
-                        />
-                        {timeLeft > 0 && (
-                          <div className="absolute top-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1 py-0.5 rounded">
-                            {formatTime(timeLeft)}
-                          </div>
-                        )}
+          <TabsContent value="suggestions" className="mt-4">
+            <ScrollArea className="h-[calc(100vh-200px)]">
+              <div className="space-y-3">
+                {aiSuggestions.map((suggestion) => (
+                  <Card key={suggestion.id} className="p-3">
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <Zap className="h-4 w-4 text-yellow-600" />
+                          <h4 className="font-medium text-sm">{suggestion.title}</h4>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {suggestion.confidence}%
+                        </Badge>
                       </div>
-                    ) : (
-                      <div className="w-32 h-32 bg-gray-100 flex items-center justify-center mx-auto">
-                        <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
+                      <p className="text-xs text-gray-600">{suggestion.description}</p>
+                      <div className="flex justify-between items-center">
+                        <Badge variant="secondary" className="text-xs">
+                          {suggestion.type}
+                        </Badge>
+                        <Button size="sm" variant="outline">
+                          Aplicar
+                        </Button>
                       </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-600 mb-2">Escaneie com WhatsApp</p>
-                  <div className="flex space-x-1">
-                    <Button variant="outline" size="sm" onClick={refreshQRCode} className="flex-1">
-                      <RefreshCw className="w-3 h-3" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setWhatsappSession(null)} className="flex-1">
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : whatsappSession.status === "WORKING" ? (
-                <div className="space-y-2">
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-700 text-xs">
-                      <strong>Conectado!</strong>
-                      {whatsappSession.me?.pushName && (
-                        <>
-                          <br />
-                          {whatsappSession.me.pushName}
-                        </>
-                      )}
-                    </AlertDescription>
-                  </Alert>
-                  <Button variant="outline" size="sm" onClick={disconnectWhatsApp} className="w-full">
-                    <WifiOff className="w-3 h-3 mr-2" />
-                    Desconectar
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center">
-                  <AlertCircle className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-                  <p className="text-xs text-gray-600 mb-2">Status: {whatsappSession.status}</p>
-                  <Button size="sm" onClick={refreshQRCode} className="w-full">
-                    Tentar Novamente
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Subtle AI Suggestions */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center">
-                <Brain className="w-4 h-4 mr-2 text-purple-600" />
-                Insights Inteligentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {getSubtleSuggestions().map((suggestion, index) => (
-                <div key={index} className="flex items-start space-x-2 p-2 bg-gray-50 rounded text-xs">
-                  <suggestion.icon className="w-3 h-3 mt-0.5 text-gray-600 flex-shrink-0" />
-                  <span className="text-gray-700">{suggestion.text}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Tasks */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center justify-between">
-                <span className="flex items-center">
-                  <CheckCircle className="w-4 h-4 mr-2 text-blue-600" />
-                  {user.role === "simple" ? "Suas Tarefas" : "Tarefas da Equipe"}
-                </span>
-                <Badge variant="secondary" className="text-xs">
-                  {tasks.filter((t) => t.status !== "completed").length}
-                </Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {tasks.slice(0, 4).map((task) => (
-                <div key={task.id} className="p-2 border border-gray-200 rounded text-xs">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-900 truncate">{task.title}</span>
-                    {task.needsFollowUp && (
-                      <Badge variant="destructive" className="text-xs">
-                        Cobrar
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between text-gray-600">
-                    <span>
-                      {user.role === "simple" ? `Por: ${task.assignedBy}` : `Para: ${task.assignedTo}`}
-                    </span>
-                    <span>{task.dueDate}</span>
-                  </div>
-                  <div className="flex items-center justify-between mt-1">
-                    <Badge
-                      variant={
-                        task.status === "completed"
-                          ? "default"
-                          : task.status === "in_progress"
-                          ? "secondary"
-                          : "outline"
-                      }
-                      className="text-xs"
-                    >
-                      {task.status === "completed"
-                        ? "Concluída"
-                        : task.status === "in_progress"
-                        ? "Em andamento"
-                        : "Pendente"}
-                    </Badge>
-                    <Badge
-                      variant={
-                        task.priority === "high" ? "destructive" : task.priority === "medium" ? "default" : "secondary"
-                      }
-                      className="text-xs"
-                    >
-                      {task.priority}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center">
-                <BarChart3 className="w-4 h-4 mr-2 text-green-600" />
-                Resumo Rápido
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-600">Conversas ativas</span>
-                <span className="font-medium">{people.filter((p) => p.status === "online").length}</span>
+                    </div>
+                  </Card>
+                ))}
               </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-600">Tarefas pendentes</span>
-                <span className="font-medium">{tasks.filter((t) => t.status === "pending").length}</span>
-              </div>
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-gray-600">Sentimento geral</span>
-                <span className="font-medium text-green-600">Positivo</span>
-              </div>
-              {user.role !== "simple" && (
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-gray-600">Precisam follow-up</span>
-                  <span className="font-medium text-red-600">
-                    {tasks.filter((t) => t.needsFollowUp).length}
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </ScrollArea>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="mt-4">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Performance Hoje
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Mensagens respondidas</span>
+                    <span className="font-semibold">24</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Tempo médio resposta</span>
+                    <span className="font-semibold">12min</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Satisfação cliente</span>
+                    <span className="font-semibold text-green-600">94%</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Conversas Ativas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>WhatsApp</span>
+                      <span className="font-semibold">8</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Email</span>
+                      <span className="font-semibold">3</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Chat</span>
+                      <span className="font-semibold">2</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Tendências</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-3 w-3 text-green-600" />
+                      <span className="text-xs">+15% produtividade esta semana</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-3 w-3 text-blue-600" />
+                      <span className="text-xs">Melhor horário: 9h-11h</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
 }
+
+// Export as default
+export default ThreeColumnWorkspace

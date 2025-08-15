@@ -1,162 +1,116 @@
-# 🚀 IA Powers - Sistema de Monitoramento WhatsApp
+# 🤖 WhatsApp AI Companion
 
-Sistema completo de monitoramento WhatsApp com análise de sentimentos em tempo real usando IA.
+Um sistema simples e amigável para conectar WhatsApp com inteligência artificial.
 
-## ✨ Funcionalidades
+## ✨ Características
 
-- 📱 **Integração WhatsApp Real** - Conexão direta via QR Code
-- 🤖 **Análise de Sentimentos IA** - Processamento automático de mensagens
-- 📊 **Dashboard em Tempo Real** - Monitoramento e analytics
-- 👥 **Gestão de Contatos** - Organização por hierarquia
-- 🔔 **Alertas Inteligentes** - Notificações automáticas
-- 📈 **Relatórios Detalhados** - Insights e métricas
+- 📱 **Interface Amigável** - Dashboard simples e intuitivo
+- 🔗 **Múltiplas Conexões** - Zapier, Make.com ou API direta
+- 🧠 **Análise de Sentimentos** - Detecta mensagens positivas/negativas
+- 📊 **Analytics em Tempo Real** - Estatísticas e métricas
+- ⚡ **Configuração Rápida** - 15 minutos para estar funcionando
 
-## 🚀 Deploy Rápido
+## 🚀 Como Usar
 
-### Opção 1: Vercel (Recomendado)
+### 1. Deploy Rápido
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/seu-usuario/whatsapp-ai-companion)
 
-1. **Fork este repositório** ou **baixe o código**
-2. **Conecte no Vercel:**
-   - Acesse [vercel.com](https://vercel.com)
-   - Clique em "New Project"
-   - Importe seu repositório
-   - Deploy automático!
-
-3. **Ou use a CLI:**
+### 2. Configurar Variáveis
 \`\`\`bash
-npm install -g vercel
-vercel --prod
+WHATSAPP_VERIFY_TOKEN=meu_token_secreto_123
+NEXT_PUBLIC_APP_URL=https://sua-app.vercel.app
 \`\`\`
 
-### Opção 2: Netlify
+### 3. Escolher Método de Conexão
 
-\`\`\`bash
-# Build do projeto
-npm run build
+#### 🟠 Zapier (Recomendado - Mais Fácil)
+- ✅ Não precisa Facebook
+- ✅ WhatsApp pessoal ou business
+- ✅ 100 mensagens grátis/mês
+- ⏱️ 15 minutos para configurar
 
-# Deploy
-npm install -g netlify-cli
-netlify deploy --prod --dir=.next
-\`\`\`
+[📖 Tutorial Zapier Completo](/tutorial/zapier)
 
-### Opção 3: Docker
+#### 🔵 Make.com (Mais Recursos)
+- ⚠️ Precisa conta Facebook
+- ✅ 1000 mensagens grátis/mês
+- ✅ Mais automações
+- ⏱️ 30 minutos para configurar
 
-\`\`\`bash
-# Build da imagem
-docker build -t iapowers-mvp .
+[📖 Tutorial Make.com](/tutorial/make)
 
-# Execute o container
-docker run -p 3000:3000 iapowers-mvp
-\`\`\`
+#### 🟢 WhatsApp Business API (Direto)
+- ⚠️ Para desenvolvedores
+- ⚠️ Precisa aprovação Facebook
+- ✅ Sem limites
+- ⏱️ 2+ horas para configurar
+
+## 📱 Funcionalidades
+
+### Dashboard Principal
+- 📊 Estatísticas em tempo real
+- 📱 Lista de mensagens recentes
+- 🎯 Análise de sentimentos
+- ⚙️ Configuração simplificada
+
+### Análise Inteligente
+- 😊 **Positivas**: Agradecimentos, elogios
+- 😐 **Neutras**: Perguntas, informações
+- 😞 **Negativas**: Reclamações, problemas
+
+### Webhook Automático
+- 🔄 Recebe mensagens em tempo real
+- 🧠 Processa com IA
+- 📊 Gera estatísticas
+- 🚨 Alertas para mensagens negativas
 
 ## 🛠️ Desenvolvimento Local
 
 \`\`\`bash
-# Clone o repositório
-git clone <seu-repo>
-cd iapowers-mvp
+# Clonar repositório
+git clone https://github.com/seu-usuario/whatsapp-ai-companion
+cd whatsapp-ai-companion
 
-# Instale dependências
+# Instalar dependências
 npm install
 
-# Execute em desenvolvimento
+# Configurar variáveis
+cp .env.example .env.local
+
+# Executar em desenvolvimento
 npm run dev
-
-# Acesse http://localhost:3000
 \`\`\`
 
-## 📋 Variáveis de Ambiente (Opcional)
+## 📋 Endpoints da API
 
-Crie um arquivo `.env.local`:
-
-\`\`\`env
-# Opcional: Para integrações futuras
-OPENAI_API_KEY=sua_chave_openai
-WEBHOOK_SECRET=seu_webhook_secret
-DATABASE_URL=sua_database_url
-NEXT_PUBLIC_APP_URL=https://seu-dominio.com
-\`\`\`
-
-## 🎯 Como Usar
-
-### 1. Acesse o Sistema
-- Abra a URL do seu deploy
-- Navegue até "Configurações → WhatsApp"
-
-### 2. Conecte o WhatsApp
-- Clique em "Conectar WhatsApp"
-- Escaneie o QR Code com seu WhatsApp
-- Aguarde confirmação de conexão
-
-### 3. Configure Monitoramento
-- Adicione contatos para monitorar
-- Configure hierarquia organizacional
-- Ative alertas automáticos
-
-### 4. Monitore em Tempo Real
-- Veja mensagens chegando automaticamente
-- Analise sentimentos em tempo real
-- Receba alertas de situações críticas
-
-## 🔧 Estrutura do Projeto
-
-\`\`\`
-iapowers-mvp/
-├── app/
-│   ├── api/
-│   │   └── whatsapp/          # APIs do WhatsApp
-│   ├── components/            # Componentes React
-│   ├── login/                 # Página de login
-│   ├── settings/              # Configurações
-│   └── page.tsx               # Dashboard principal
-├── components/ui/             # Componentes UI (shadcn)
-├── lib/                       # Utilitários
-└── public/                    # Arquivos estáticos
-\`\`\`
-
-## 🔗 Endpoints da API
-
-### Sistema
+- `GET /api/whatsapp/webhook` - Verificação do webhook
+- `POST /api/whatsapp/webhook` - Receber mensagens
 - `GET /api/whatsapp/health` - Status do sistema
-- `GET /api/whatsapp/sessions` - Listar sessões
-- `POST /api/whatsapp/sessions` - Criar sessão
+- `GET /api/whatsapp/test` - Testar configuração
 
-### Mensagens
-- `GET /api/whatsapp/messages` - Listar mensagens
-- `POST /api/whatsapp/messages` - Processar mensagem
+## 🔧 Configuração do Webhook
 
-### Webhooks
-- `POST /api/webhook/whatsapp` - Receber webhooks
+### URL do Webhook
+\`\`\`
+https://sua-app.vercel.app/api/whatsapp/webhook
+\`\`\`
 
-## 🛡️ Segurança
+### Token de Verificação
+\`\`\`
+meu_token_secreto_123
+\`\`\`
 
-- ✅ APIs protegidas
-- ✅ Dados criptografados
-- ✅ Sessões seguras
-- ✅ Webhooks validados
+## 📞 Suporte
 
-## 📊 Tecnologias
-
-- **Frontend:** Next.js 14, React, TypeScript, Tailwind CSS
-- **Backend:** Next.js API Routes, Node.js
-- **UI:** shadcn/ui, Radix UI, Lucide Icons
-- **Deploy:** Vercel, Netlify, Docker
-
-## 🆘 Suporte
-
-- 📧 **Email:** suporte@iapowers.com
-- 📚 **Documentação:** [docs.iapowers.com](https://docs.iapowers.com)
-- 🐛 **Issues:** [GitHub Issues](https://github.com/seu-repo/issues)
+- 📖 [Documentação Completa](/)
+- 🎥 [Tutoriais em Vídeo](/tutorial)
+- 🧪 [Página de Testes](/test/automation)
+- ❓ [FAQ](/help)
 
 ## 📄 Licença
 
-MIT License - veja [LICENSE](LICENSE) para detalhes.
+MIT License - Livre para uso pessoal e comercial.
 
 ---
 
-**✅ SISTEMA PRONTO PARA PRODUÇÃO!**
-
-Desenvolvido com ❤️ pela equipe IA Powers
-\`\`\`
-
-Agora vou criar um Dockerfile para deploy em containers:
+**Feito com ❤️ para facilitar a integração WhatsApp + IA**
