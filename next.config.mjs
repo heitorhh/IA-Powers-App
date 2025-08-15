@@ -1,38 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    serverComponentsExternalPackages: []
+  },
   eslint: {
     ignoreDuringBuilds: true,
   },
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    serverComponentsExternalPackages: []
-  },
   images: {
-    domains: ['api.qrserver.com'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'api.qrserver.com',
-        port: '',
-        pathname: '/v1/create-qr-code/**',
-      },
-    ],
+    domains: ['api.qrserver.com', 'chart.googleapis.com'],
     unoptimized: true,
   },
-  async headers() {
-    return [
-      {
-        source: '/api/:path*',
-        headers: [
-          { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, PUT, DELETE, OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
-        ],
-      },
-    ]
-  },
-}
+  env: {
+    EVOLUTION_API_URL: process.env.EVOLUTION_API_URL,
+    EVOLUTION_API_KEY: process.env.EVOLUTION_API_KEY,
+    XAI_API_KEY: process.env.XAI_API_KEY,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL
+  }
+};
 
-export default nextConfig
+export default nextConfig;
